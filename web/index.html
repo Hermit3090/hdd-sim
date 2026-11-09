@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hdd-sim</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="panel faceplate">
+    <div class="brand">
+      <h1>hdd-sim</h1>
+      <p id="drive-state" class="status">Stopped. Press Spin up to start.</p>
+    </div>
+    <div class="lamp-box">
+      <div id="lamp" class="lamp" data-color="green" role="img" aria-label="Drive activity light"></div>
+      <span class="lamp-label">HDD</span>
+    </div>
+    <div class="transport">
+      <button id="spin-up" class="primary">Spin up</button>
+      <button id="spin-down">Spin down</button>
+      <label class="check"><input id="mute" type="checkbox"> Mute sound</label>
+    </div>
+  </header>
+
+  <main>
+    <section class="column">
+      <div class="panel">
+        <h2>Activity source</h2>
+        <div class="choices">
+          <label class="check"><input type="radio" name="mode" value="sim" checked> Simulation</label>
+          <label class="check"><input type="radio" name="mode" value="live"> Live (this computer's disks)</label>
+        </div>
+        <div id="live-box" hidden>
+          <div class="row">
+            <label for="device">Device</label>
+            <select id="device"><option value="*">All devices summed</option></select>
+          </div>
+          <p id="live-status" class="status">Connecting…</p>
+        </div>
+        <div id="sim-box">
+          <div class="row">
+            <label for="scenario">Scenario</label>
+            <select id="scenario"></select>
+          </div>
+          <div data-group="Simulation"></div>
+        </div>
+        <p class="hint">Seek-distance spread also applies in live mode, where real seek distances are unknown.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Audition</h2>
+        <div class="row">
+          <label for="seek-dist">Seek distance</label>
+          <input id="seek-dist" type="range" min="0.01" max="1" step="0.01" value="0.2">
+          <output id="seek-dist-out">0.20</output>
+        </div>
+        <div class="buttons"><button id="seek">Seek</button></div>
+        <p class="hint">A seek longer than the two-click threshold gives a start and an end click.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Mix</h2>
+        <div data-group="Mix"></div>
+        <p class="hint">A volume at −60 dB is exact silence. Set Spindle volume to −60 dB to hear and export the head alone.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Export</h2>
+        <div class="row">
+          <label for="export-rate">Sample rate</label>
+          <select id="export-rate"><option value="44100">44100 Hz</option><option value="48000">48000 Hz</option></select>
+        </div>
+        <div class="row">
+          <label for="export-scenario">Burst scenario</label>
+          <select id="export-scenario"></select>
+        </div>
+        <div data-group="Export"></div>
+        <div class="buttons">
+          <button data-export="clicks" class="primary">One-shot clicks (zip)</button>
+          <button data-export="burst">burst.wav</button>
+          <button data-export="spinup">spinup.wav</button>
+          <button data-export="spindown">spindown.wav</button>
+          <button data-export="spindle_loop">spindle_loop.wav</button>
+          <button data-export="idle">idle.wav</button>
+          <button data-export="all">Everything (zip)</button>
+        </div>
+        <p id="export-status" class="status"></p>
+        <p class="hint">WAV, mono, 16-bit. One-shot clicks are always head only, peak at −1 dBFS.</p>
+      </div>
+    </section>
+
+    <section class="column">
+      <div class="panel">
+        <h2>Drive</h2>
+        <div class="row">
+          <label for="preset">Preset</label>
+          <select id="preset"></select>
+        </div>
+        <details open>
+          <summary>Head click</summary>
+          <div data-group="Head click"></div>
+          <h3>Resonators</h3>
+          <table id="resonators">
+            <thead><tr><th>Frequency (Hz)</th><th>Decay (ms)</th><th>Level (dB)</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <button id="add-resonator">Add resonator</button>
+        </details>
+        <details>
+          <summary>Spindle</summary>
+          <div data-group="Spindle"></div>
+          <div class="row">
+            <label for="harmonics">Motor harmonics</label>
+            <input id="harmonics" type="text" spellcheck="false">
+          </div>
+          <p class="hint">Harmonic number and level in dB, e.g. <code>1:0, 10:-25, 12:-28</code>.</p>
+        </details>
+        <details>
+          <summary>Drive model</summary>
+          <div data-group="Drive model"></div>
+        </details>
+        <details>
+          <summary>Light</summary>
+          <div class="row">
+            <label for="light-color">Colour</label>
+            <select id="light-color"><option>red</option><option>green</option><option>amber</option></select>
+          </div>
+          <div data-group="Light"></div>
+        </details>
+      </div>
+
+      <div class="panel">
+        <h2>Parameters</h2>
+        <div class="row">
+          <label for="seed">Seed</label>
+          <input id="seed" type="number" min="0" max="4294967295" step="1">
+        </div>
+        <div class="buttons">
+          <button id="params-export">Save parameters (JSON)</button>
+          <button id="params-import">Load parameters…</button>
+          <button id="params-reset">Reset to preset defaults</button>
+          <input id="params-file" type="file" accept="application/json,.json" hidden>
+        </div>
+        <p id="params-status" class="status"></p>
+        <p class="hint">The seed makes exports reproducible. The saved file works with <code>node cli/render.js --params</code>.</p>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

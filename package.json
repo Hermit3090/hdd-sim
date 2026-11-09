@@ -1,0 +1,13 @@
+{
+  "name": "hdd-sim",
+  "version": "0.1.0",
+  "description": "Hard drive sound synthesizer with an emulated activity light",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server/server.js",
+    "render": "node cli/render.js",
+    "test": "node --test"
+  }
+}

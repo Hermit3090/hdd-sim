@@ -1,0 +1,68 @@
+# hdd-sim
+
+A synthesized old-school hard drive: head clicks, spindle, and an activity light, driven by this
+computer's real disk activity or by a simulation. It also exports clean one-shot click samples
+and longer sequences as WAV files. All sound is generated from parameters; no recordings are used.
+
+The specification is in [docs/SPEC.md](docs/SPEC.md).
+
+## Requirements
+
+Node 20 or newer and a current browser. There are no dependencies to install.
+Live mode needs Linux. Simulation and export work anywhere.
+
+## Run
+
+```
+npm start
+```
+
+Then open http://127.0.0.1:8125/ and press **Spin up**. Use `npm start -- --port 9000` for
+another port. The server only listens on this computer and only reads disk statistics.
+
+- **Simulation** plays a scenario; every parameter can be changed while it runs.
+- **Live** follows the disks of this computer. Real activity passes through the emulated drive, so
+  an SSD still produces the pulsing pattern of a hard drive.
+- **Spindle volume at −60 dB** leaves the head sound alone, for sampling.
+
+## Export
+
+From the page, or from the command line:
+
+```
+node cli/render.js --out out
+node cli/render.js --params hdd-sim-params.json --out out --only clicks
+```
+
+`--params` takes a file saved with "Save parameters (JSON)" in the page. Other options:
+`--preset`, `--rate 44100|48000`, `--seed`, `--only clicks|sequences|all`.
+
+Output: `click_01.wav` … `click_16.wav` (head only, at most 60 ms, peak at −1 dBFS) and
+`burst.wav`, `spinup.wav`, `spindown.wav`, `spindle_loop.wav`, `idle.wav`. All mono, 16-bit.
+The same parameters and seed always give the same files.
+
+## Tests
+
+```
+npm test
+```
+
+## Layout
+
+| Path | Content |
+|---|---|
+| `src/dsp/` | Synth core, shared by the browser and Node |
+| `src/server/` | Local server and disk statistics |
+| `web/` | The page and its audio worklet |
+| `cli/render.js` | Export command |
+| `test/` | Tests, named after the spec requirements they cover |
+
+## Known deviations from the spec
+
+- **R5.4, transfer time is capped.** One operation's transfer lasts at most 30 ms (parameter
+  "Longest single transfer"). Without the cap, operations merged under R5.5 during a large copy
+  would keep the emulated drive busy for minutes after the load ended, which contradicts the
+  purpose stated in R5.5 and acceptance point A2. Awaiting the owner's decision.
+- **R10.5, identical files.** Page and command share the same code and give byte-identical files
+  in Chromium. Other browsers may round sine and exponential functions differently in the last
+  digit; this has not been checked.
