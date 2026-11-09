@@ -1,6 +1,6 @@
 # hdd-sim specification
 
-Status: DRAFT, awaiting owner approval. No code is written before this is approved and committed.
+Status: APPROVED by the owner on 2026-11-10. Changes to this document need owner approval.
 
 ## 1. Purpose
 
