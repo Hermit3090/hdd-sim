@@ -181,17 +181,25 @@ It applies in live mode only.
   sample included. At or below the baseline its operations are background activity; above it
   they are normal activity.
 - R8.7 Baseline mode is "off" (all activity is normal), "manual" (a slider, 0–500 operations per
-  second, default 10) or "adaptive" (the default).
-- R8.8 In adaptive mode the baseline is 1.5 × the 90th percentile of the operations-per-second
-  values of the last two minutes, and never above the adaptive ceiling (default 50 operations
-  per second, range 1–500). Activity above the ceiling is therefore always normal. Until 20
-  seconds of data are available, the manual value is used.
+  second, default 10) or "adaptive" (the default). R8.6 applies in manual mode only.
+- R8.8 Adaptive mode uses no threshold. It keeps an activity level between 0 % and 100 %,
+  starting at 0 %:
+  - During every statistics sample that contains operations the level rises, at a rate that
+    takes it from 0 % to 100 % in the ramp-up time of uninterrupted activity (default 1.5 s,
+    range 0.1–10 s).
+  - During every sample without operations it falls, at a rate that takes it from 100 % to 0 %
+    in the cooldown time (default 10 s, range 1–120 s).
+  A single short burst therefore stays quiet, bursts that follow each other within the cooldown
+  add up, and sustained activity reaches the normal level.
 - R8.9 Background activity passes through the drive model like normal activity, with two
   differences: the light rises only to the background brightness (default 15 %, range 0–100 %),
   and clicks play at the background click level relative to normal clicks (default −18 dB, range
-  silence to 0 dB).
-- R8.10 The page shows the current baseline and whether the current activity is rated
-  background or normal.
+  silence to 0 dB). In adaptive mode all activity is treated this way, with both values moved
+  towards normal by the activity level: the brightness limit in a straight line from the
+  background brightness to 100 %, the click level in a straight line in dB from the background
+  click level to 0 dB. The level that counts is the one at the moment the seek starts.
+- R8.10 The page shows, in manual mode, the baseline and whether the current activity is rated
+  background or normal, and in adaptive mode the activity level.
 
 ## 9. Simulation mode
 
@@ -205,6 +213,21 @@ It applies in live mode only.
   individual sounds. In separate head sound mode the seek can be a read or a write.
 - R9.4 All drive parameters from sections 5–7 are editable in the page while sound plays, and
   changes are audible within 100 ms.
+
+### Read and write pattern
+
+On a real system writes are collected in memory and flushed in bursts to places close together,
+while reads happen on demand and jump around.
+
+- R9.5 A switch "read/write pattern", off by default. Off: reads and writes are treated the
+  same, as in R9.1. It is independent of the head sound mode (R6.20).
+- R9.6 On, in live and in simulation mode: the seek-distance spread of R9.1 is replaced by a
+  read seek spread (default 0.9) and a write seek spread (default 0.5), both 0–1, and seeks of
+  write operations are no longer than the write seek reach (default 0.2 of the full stroke,
+  range 0.01–1).
+- R9.7 On, in simulation mode only: write operations are not passed on when generated but
+  collected and passed on together at every flush interval (default 5 s, range 0.5–30 s). Reads
+  are not delayed. In live mode the timing is the real one and is not changed.
 
 ## 10. Export
 
@@ -283,10 +306,12 @@ This is the reference the owner rates best. The "laptop-2000s" preset is tuned t
   cap), R6.5 (click length), R6.12 (layer isolation), R6.13 (no clipping, no NaN), R10.2
   (one-shot format, onset, peak, silent end, length), R10.3 (loop seam), R10.5 (page core and
   command agree), R6.16–R6.19 (filter modes, exact bypass, exports), R6.20–R6.21 (write sound),
-  R8.6–R8.9 (baseline rating, adaptive baseline and ceiling, background light and click level),
-  R10.6 (file names).
+  R8.6–R8.9 (baseline rating, activity level ramp-up and cooldown, background light and click
+  level), R9.5–R9.7 (read/write pattern), R10.6 (file names).
 - A2 With the baseline off, live mode reacts to a real disk load within 200 ms and returns to
-  idle when the load ends. With a baseline, a load of at least five times the baseline is rated
-  normal within 250 ms.
+  idle when the load ends. With a manual baseline, a load of at least five times the baseline is
+  rated normal within 250 ms. In adaptive mode an uninterrupted load reaches the normal level
+  within the ramp-up time plus 100 ms, and with the default
+  settings a single burst of 100 ms from rest stays below 10 %.
 - A3 The owner judges realism by ear against the reference collection. Parameter retuning that
   stays inside the ranges in this spec is not a spec change.
