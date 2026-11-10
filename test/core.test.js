@@ -104,7 +104,7 @@ test('spec defaults: presets match the documented values', () => {
   // R6.14: the default preset is the owner's tuning, as saved in presets/.
   const d = defaultParams();
   assert.equal(d.preset, 'desktop-90s-2');
-  assert.deepEqual(d.mix, { headDb: -11.5, spindleDb: 0, masterDb: 0 });
+  assert.deepEqual(d.mix, { headDb: -11.5, spindleDb: 0, masterDb: -6 });
   const saved = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'presets', 'hdd-sim-preset-2-desktop.json'), 'utf8'));
   for (const key of ['drive', 'click', 'spindle']) assert.deepEqual(d[key], saved[key], key);
   assert.deepEqual([d.spindle.whineHz, d.spindle.whineDb], [4320, -56]);
@@ -263,15 +263,26 @@ test('R6.4: longer seeks are louder and brighter, and long seeks click twice', (
 });
 
 test('R6.6: the head layer is digital silence between clicks', () => {
-  const engine = new Engine(sanitizeParams({ drive: { idleRecal: false } }), 48000);
-  engine.spinUp(true);
-  engine.triggerSeek(0.2);
-  const head = new Float32Array(48000);
-  const spindle = new Float32Array(48000);
-  engine.processLayers(head, spindle);
+  const run = (filtersOn) => {
+    const p = defaultParams();
+    p.drive.idleRecal = false;
+    if (!filtersOn) for (const type of ['hp', 'lp']) for (const f of Object.values(p.filters[type])) f.on = false;
+    const engine = new Engine(sanitizeParams(p), 48000);
+    engine.spinUp(true);
+    engine.triggerSeek(0.2);
+    const head = new Float32Array(48000);
+    const spindle = new Float32Array(48000);
+    engine.processLayers(head, spindle);
+    assert.ok(spindle.some((v) => v !== 0));
+    return head;
+  };
+  const head = run(false);
   assert.ok(head.subarray(0, 2880).some((v) => v !== 0));
   assert.ok(head.subarray(2880).every((v) => v === 0));
-  assert.ok(spindle.some((v) => v !== 0));
+  // With the default filters the click rings out a little longer, then it is exact silence too.
+  const filtered = run(true);
+  assert.ok(filtered.subarray(0, 2880).some((v) => v !== 0));
+  assert.ok(filtered.subarray(9600).every((v) => v === 0)); // from 200 ms
 });
 
 test('R6.12: with the spindle at silence the output is exactly the head layer, and the reverse', () => {
@@ -335,7 +346,7 @@ test('R6.9, R6.10: spin-up takes the configured time, then the head unlocks; spi
   assert.equal(engine.model.ready, true);
 
   engine.spinDown();
-  for (let i = 0; i < 13; i++) engine.processLayers(head, spindle);
+  for (let i = 0; i < 14; i++) engine.processLayers(head, spindle); // 6 s to stop, then the filters ring out
   assert.equal(engine.spindle.state, 'stopped');
   assert.ok(spindle.every((v) => v === 0));
 });

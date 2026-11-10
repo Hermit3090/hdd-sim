@@ -3,7 +3,7 @@
 import { exportAll, exportClicks, exportSequence } from '/dsp/export.js';
 import {
   DEFAULT_PRESET, FILTER_LIMITS, PRESET_NAMES, RESONATOR_LIMITS, SCENARIO_NAMES, SCHEMA,
-  defaultParams, getPath, presetParams, sanitizeParams, scenarioParams, setPath,
+  applyPreset, defaultParams, getPath, sanitizeParams, scenarioParams, setPath,
 } from '/dsp/params.js';
 import { makeZip } from '/dsp/zip.js';
 
@@ -13,7 +13,7 @@ const $ = (id) => document.getElementById(id);
 
 let params = loadStored();
 let audio = null; // { ctx, node } once sound has been started
-let mode = 'sim';
+let mode = 'live'; // R8.11
 let pushQueued = false;
 
 function loadStored() {
@@ -464,6 +464,7 @@ function init() {
   fillSelect($('scenario'), SCENARIO_NAMES);
   fillSelect($('export-scenario'), SCENARIO_NAMES);
   refreshAll();
+  setMode(mode);
 
   $('spin-up').addEventListener('click', () => spin(true));
   $('spin-down').addEventListener('click', () => spin(false));
@@ -504,7 +505,7 @@ function init() {
   }
 
   $('preset').addEventListener('change', () => {
-    Object.assign(params, presetParams($('preset').value), { preset: $('preset').value });
+    applyPreset(params, $('preset').value);
     refreshAll();
     pushParams();
   });

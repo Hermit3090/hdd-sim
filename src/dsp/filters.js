@@ -9,6 +9,8 @@ const SPINDLE_PARTS = ['motor', 'air', 'whine'];
 // Q of the last stage, which lifts the response at the cutoff by that amount.
 const STAGE_Q = { 12: [Math.SQRT1_2], 24: [0.5411961, 1.3065630] };
 
+const SETTLED = 1e-9;
+
 class Biquad {
   constructor() {
     this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0;
@@ -45,9 +47,11 @@ class Biquad {
       z2 = b2 * x - a2 * y;
       buf[i] = y;
     }
-    // Keep a silent filter from idling in denormal numbers.
-    this.z1 = Math.abs(z1) < 1e-30 ? 0 : z1;
-    this.z2 = Math.abs(z2) < 1e-30 ? 0 : z2;
+    // Once the ringing is below -180 dB the filter is reset, so that silence
+    // going in becomes exact silence coming out (R6.6) and no denormals remain.
+    const quiet = Math.abs(z1) < SETTLED && Math.abs(z2) < SETTLED;
+    this.z1 = quiet ? 0 : z1;
+    this.z2 = quiet ? 0 : z2;
   }
 }
 

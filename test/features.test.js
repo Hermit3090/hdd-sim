@@ -9,15 +9,26 @@ import { DriveModel } from '../src/dsp/drive-model.js';
 import { Engine } from '../src/dsp/engine.js';
 import { exportClicks, renderClickSet, renderSequence } from '../src/dsp/export.js';
 import { Filter } from '../src/dsp/filters.js';
-import { FILTER_TARGETS, defaultParams, sanitizeParams, scenarioParams } from '../src/dsp/params.js';
+import {
+  FILTER_TARGETS, PRESET_NAMES, applyPreset, defaultParams, sanitizeParams, scenarioParams,
+} from '../src/dsp/params.js';
 import { makeRng } from '../src/dsp/prng.js';
 
 const SR = 48000;
 const PARTS = ['head', 'motor', 'air', 'whine'];
 
+/** Defaults with the filters and the read/write pattern off; each is tested on its own. */
+function base(preset = 'laptop-2000s') {
+  const p = defaultParams(preset);
+  p.pattern.on = false;
+  p.filters.hpMode = 'combined';
+  p.filters.lpMode = 'combined';
+  for (const type of ['hp', 'lp']) for (const target of FILTER_TARGETS) p.filters[type][target].on = false;
+  return p;
+}
+
 function thrash(edit) {
-  const p = defaultParams('laptop-2000s');
-  p.pattern.on = false; // tested on its own below
+  const p = base();
   p.sim = scenarioParams('thrash');
   if (edit) edit(p);
   const engine = new Engine(sanitizeParams(p), SR);
@@ -85,12 +96,26 @@ test('R6.15: high-pass and low-pass with cutoff, 12 or 24 dB per octave, and a r
   }
 });
 
-test('R6.17: every filter is off by default, and a filter that is off changes nothing', () => {
-  const d = defaultParams();
-  for (const type of ['hp', 'lp']) {
-    assert.equal(d.filters[`${type}Mode`], 'combined');
-    for (const target of FILTER_TARGETS) assert.equal(d.filters[type][target].on, false);
+test('R6.17: preset filter defaults; a filter that is off changes nothing', () => {
+  const on = (hz, resDb = 0) => ({ on: true, hz, resDb, slope: 12 });
+  const off = (hz) => ({ on: false, hz, resDb: 0, slope: 12 });
+  const laptop = defaultParams('laptop-2000s').filters;
+  assert.deepEqual([laptop.hpMode, laptop.lpMode], ['combined', 'combined']);
+  assert.deepEqual(laptop.hp.all, on(150));
+  assert.deepEqual(laptop.lp.all, on(4000));
+  for (const part of PARTS) {
+    assert.deepEqual(laptop.hp[part], off(150));
+    assert.deepEqual(laptop.lp[part], off(4000));
   }
+  for (const preset of ['desktop-90s', 'desktop-90s-2']) {
+    const f = defaultParams(preset).filters;
+    assert.deepEqual([f.hpMode, f.lpMode], ['combined', 'separate']);
+    assert.deepEqual(f.hp.all, on(150));
+    assert.deepEqual(f.lp, { all: off(4000), head: on(3606, 1.5), motor: on(5848), air: on(9100), whine: on(1897) });
+    for (const part of PARTS) assert.deepEqual(f.hp[part], off(150));
+  }
+  assert.notDeepEqual(render(thrash((p) => { p.filters = defaultParams('laptop-2000s').filters; })), render(thrash()));
+
   const plain = render(thrash(), 2);
   for (const mode of ['combined', 'separate']) {
     const withOffFilters = render(thrash((p) => {
@@ -156,7 +181,7 @@ test('R6.16: high-pass and low-pass modes are chosen independently', () => {
 
 test('R6.16: a high-pass on the motor tones removes the deep rotation tone and keeps the rest', () => {
   const quiet = (edit) => {
-    const p = defaultParams('laptop-2000s'); // 4200 rpm: a 70 Hz rotation tone
+    const p = base(); // 4200 rpm: a 70 Hz rotation tone
     p.drive.idleRecal = false;
     if (edit) edit(p);
     const engine = new Engine(sanitizeParams(p), SR);
@@ -197,9 +222,9 @@ test('R6.19: one-shot clicks with filters still meet R10.2', () => {
       Object.assign(p.filters.lp.head, { on: true, hz: 2500 });
     },
   ];
-  const plain = renderClickSet(defaultParams());
+  const plain = renderClickSet(base());
   for (const edit of settingsList) {
-    const p = defaultParams();
+    const p = base();
     edit(p);
     const sr = p.export.sampleRate;
     const files = renderClickSet(p);
@@ -217,7 +242,7 @@ test('R6.19: one-shot clicks with filters still meet R10.2', () => {
     });
   }
   // A filter on another sound part leaves the clicks alone.
-  const p = defaultParams();
+  const p = base();
   p.filters.hpMode = 'separate';
   Object.assign(p.filters.hp.motor, { on: true, hz: 300 });
   assert.deepEqual(renderClickSet(p), plain);
@@ -233,7 +258,7 @@ test('R6.19: filters apply to sequences, and the filtered spindle loop still rep
     },
   ];
   for (const edit of edits) {
-    const p = defaultParams();
+    const p = base();
     p.export.loopSeconds = 1;
     const plain = renderSequence('spindle_loop', p);
     edit(p);
@@ -249,7 +274,7 @@ test('R6.19: filters apply to sequences, and the filtered spindle loop still rep
     assert.ok(Math.abs(loop[1] - 2 * loop[0] + loop[n - 1]) <= maxBend, 'bend at the seam');
     assert.ok(Math.abs(loop[0] - 2 * loop[n - 1] + loop[n - 2]) <= maxBend, 'bend at the seam');
   }
-  const p = defaultParams();
+  const p = base();
   p.export.burstSeconds = 2;
   const plainBurst = renderSequence('burst', p);
   Object.assign(p.filters.lp.all, { on: true, hz: 1000, slope: 24 });
@@ -259,7 +284,7 @@ test('R6.19: filters apply to sequences, and the filtered spindle loop still rep
 // ---------- read and write sound ----------
 
 function seekSound(edit, write) {
-  const p = defaultParams();
+  const p = base();
   p.drive.idleRecal = false;
   if (edit) edit(p);
   const engine = new Engine(sanitizeParams(p), SR);
@@ -289,7 +314,7 @@ test('R6.20: in separate mode write clicks differ by the pitch offset and the le
   assert.ok(read.every((v, i) => Math.abs(lower[i] - v * factor) < 1e-6));
 
   // Pitch offset: every resonance moves by the factor.
-  const p = defaultParams();
+  const p = base();
   p.click.resonators = [{ freq: 2000, decayMs: 10, gainDb: 0 }, { freq: 2000, decayMs: 10, gainDb: -60 }];
   p.click.body.gainDb = -60;
   Object.assign(p.click, { varFreqPct: 0, varDecayPct: 0, varLevelDb: 0 });
@@ -353,7 +378,7 @@ test('R6.21: a merged operation takes the type of the one it joins; recalibratio
 });
 
 test('R10.6: separate mode exports a read set and a write set; combined names are unchanged', () => {
-  const p = defaultParams();
+  const p = base();
   p.export.clickCount = 4;
   const combined = exportClicks(p);
   assert.deepEqual(combined.map((f) => f.name), ['click_01.wav', 'click_02.wav', 'click_03.wav', 'click_04.wav']);
@@ -456,7 +481,7 @@ test('A2: in adaptive mode a steady load is at the normal level within the ramp-
 });
 
 function liveEngine(live) {
-  const p = defaultParams();
+  const p = base();
   p.drive.idleRecal = false;
   p.sim.seekSpread = 1; // every operation seeks
   Object.assign(p.live, live);
@@ -607,4 +632,34 @@ test('R9.7: simulated writes are collected and passed on together at every flush
   live.feed(4, 4096, DT, 4);
   render(live, 0.1);
   assert.equal(liveOps.filter((o) => o.write).length, 4);
+});
+
+// ---------- presets ----------
+
+test('R6.14: a preset sets every Drive, Mix and Filters setting, and leaves the master volume alone', () => {
+  const groups = ['drive', 'click', 'spindle', 'rw', 'light', 'filters'];
+  for (const name of PRESET_NAMES) {
+    // Start from another preset with every preset setting changed.
+    const p = defaultParams(name === 'laptop-2000s' ? 'desktop-90s' : 'laptop-2000s');
+    p.mix = { headDb: 3, spindleDb: -40, masterDb: -20 };
+    p.rw = { mode: 'separate', writePitchPct: 10, writeLevelDb: 5 };
+    p.light = { onMs: 20, offMs: 200, color: 'red' };
+    p.filters.hpMode = 'separate';
+    p.filters.lp.all.hz = 500;
+    p.live.rampUpS = 3;
+    applyPreset(p, name);
+    const fresh = defaultParams(name);
+    assert.equal(p.preset, name);
+    for (const group of groups) assert.deepEqual(p[group], fresh[group], `${name}: ${group}`);
+    assert.deepEqual(p.mix, { headDb: fresh.mix.headDb, spindleDb: fresh.mix.spindleDb, masterDb: -20 });
+    assert.equal(p.live.rampUpS, 3, 'settings outside the preset stay');
+    assert.deepEqual(sanitizeParams(p), p);
+  }
+  // R6.11 defaults, and all of it survives the parameter file.
+  assert.deepEqual(defaultParams().mix, { headDb: -11.5, spindleDb: 0, masterDb: -6 });
+  const edited = defaultParams();
+  edited.mix = { headDb: -3, spindleDb: -7, masterDb: -12 };
+  edited.filters.lp.head.hz = 2222;
+  edited.light.color = 'amber';
+  assert.deepEqual(sanitizeParams(JSON.parse(JSON.stringify(edited))), edited);
 });

@@ -20,9 +20,10 @@ npm start
 Then open http://127.0.0.1:8125/ and press **Spin up**. Use `npm start -- --port 9000` for
 another port. The server only listens on this computer and only reads disk statistics.
 
-- **Simulation** plays a scenario; every parameter can be changed while it runs.
-- **Live** follows the disks of this computer. Real activity passes through the emulated drive, so
+- **Live** (the start mode) follows the disks of this computer. Real activity passes through the emulated drive, so
   an SSD still produces the pulsing pattern of a hard drive.
+- **Simulation** plays a scenario; every parameter can be changed while it runs.
+- **Presets** set everything in the Drive, Mix and Filters sections. The master volume is kept.
 - **Spindle volume at −60 dB** leaves the head sound alone, for sampling.
 - **Idle baseline** (live mode): keeps a system's background disk activity quiet. "Adaptive"
   starts every activity dim and quiet and raises it to normal while the activity lasts (ramp-up

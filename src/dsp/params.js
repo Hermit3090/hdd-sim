@@ -18,6 +18,15 @@ export function dbToGain(db, floor = SILENCE_DB) {
   return db <= floor ? 0 : Math.pow(10, db / 20);
 }
 
+const DEFAULT_MASTER_DB = -6;
+
+// One filter per target, all off.
+function filterSet(hz) {
+  const set = {};
+  for (const target of FILTER_TARGETS) set[target] = { on: false, hz, resDb: 0, slope: 12 };
+  return set;
+}
+
 const PRESETS = {
   'laptop-2000s': {
     drive: {
@@ -72,6 +81,30 @@ const PRESETS = {
 PRESETS['desktop-90s-2'] = JSON.parse(JSON.stringify(PRESETS['desktop-90s']));
 Object.assign(PRESETS['desktop-90s-2'].spindle, { whineHz: 4320, whineDb: -56 });
 
+// A preset also sets read and write sound, light, head and spindle volume
+// and all filters (R6.14). Filter defaults: R6.17.
+for (const name of Object.keys(PRESETS)) {
+  const hp = filterSet(150);
+  const lp = filterSet(4000);
+  hp.all.on = true;
+  let lpMode = 'combined';
+  if (name === 'laptop-2000s') {
+    lp.all.on = true;
+  } else {
+    lpMode = 'separate';
+    Object.assign(lp.head, { on: true, hz: 3606, resDb: 1.5 });
+    Object.assign(lp.motor, { on: true, hz: 5848 });
+    Object.assign(lp.air, { on: true, hz: 9100 });
+    Object.assign(lp.whine, { on: true, hz: 1897 });
+  }
+  Object.assign(PRESETS[name], {
+    rw: { mode: 'combined', writePitchPct: -6, writeLevelDb: 0 },
+    light: { onMs: 2, offMs: 30, color: 'green' },
+    mix: { headDb: -11.5, spindleDb: 0 },
+    filters: { hpMode: 'combined', lpMode, hp, lp },
+  });
+}
+
 const SCENARIOS = {
   'idle': { opsPerSec: 0, burstiness: 0, burstLen: 5, seekSpread: 0.7, readMix: 0.8, opSizeKB: 32 },
   'light desktop use': { opsPerSec: 4, burstiness: 0.85, burstLen: 5, seekSpread: 0.7, readMix: 0.7, opSizeKB: 32 },
@@ -87,9 +120,18 @@ export const DEFAULT_SCENARIO = 'light desktop use';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
-/** Drive, click and spindle parameters of a preset (a fresh copy). */
+/** Everything a preset sets (a fresh copy). The mix has no master volume. */
 export function presetParams(name) {
   return clone(PRESETS[name] || PRESETS[DEFAULT_PRESET]);
+}
+
+/** Puts a preset's settings into a parameter object; the master volume stays. */
+export function applyPreset(params, name) {
+  const preset = presetParams(name);
+  const masterDb = params.mix ? params.mix.masterDb : DEFAULT_MASTER_DB;
+  Object.assign(params, preset, { preset: PRESETS[name] ? name : DEFAULT_PRESET });
+  params.mix.masterDb = masterDb;
+  return params;
 }
 
 /** Simulation parameters of a scenario (a fresh copy). */
@@ -97,30 +139,14 @@ export function scenarioParams(name) {
   return clone(SCENARIOS[name] || SCENARIOS[DEFAULT_SCENARIO]);
 }
 
-// One filter per target, all off (R6.17).
-function filterSet(hz) {
-  const set = {};
-  for (const target of FILTER_TARGETS) set[target] = { on: false, hz, resDb: 0, slope: 12 };
-  return set;
-}
-
 /** A complete parameter object. */
 export function defaultParams(preset = DEFAULT_PRESET) {
   const name = PRESETS[preset] ? preset : DEFAULT_PRESET;
-  return {
+  return applyPreset({
     version: PARAMS_VERSION,
     seed: 1,
     preset: name,
-    ...presetParams(name),
-    mix: { headDb: -11.5, spindleDb: 0, masterDb: 0 },
-    light: { onMs: 2, offMs: 30, color: 'green' },
-    rw: { mode: 'combined', writePitchPct: -6, writeLevelDb: 0 },
-    filters: {
-      hpMode: 'combined',
-      lpMode: 'combined',
-      hp: filterSet(120),
-      lp: filterSet(8000),
-    },
+    mix: { masterDb: DEFAULT_MASTER_DB },
     live: { baselineMode: 'adaptive', baselineOps: 16, rampUpS: 0.4, cooldownS: 8, bgLightPct: 28, bgClickDb: -15.5 },
     pattern: { on: true, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 },
     scenario: DEFAULT_SCENARIO,
@@ -129,7 +155,7 @@ export function defaultParams(preset = DEFAULT_PRESET) {
       sampleRate: 44100, clickCount: 16, distMin: 0.05, distMax: 1,
       burstScenario: 'light desktop use', burstSeconds: 8, loopSeconds: 4, idleSeconds: 20,
     },
-  };
+  }, name);
 }
 
 // Numeric and boolean controls. `path` addresses the parameter object.
@@ -137,7 +163,7 @@ export function defaultParams(preset = DEFAULT_PRESET) {
 export const SCHEMA = [
   { group: 'Mix', path: 'mix.headDb', label: 'Head volume', min: -60, max: 6, step: 0.5, unit: 'dB' },
   { group: 'Mix', path: 'mix.spindleDb', label: 'Spindle volume', min: -60, max: 6, step: 0.5, unit: 'dB' },
-  { group: 'Main', path: 'mix.masterDb', label: 'Main volume', min: -60, max: 6, step: 0.5, unit: 'dB' },
+  { group: 'Main', path: 'mix.masterDb', label: 'Master volume', min: -60, max: 6, step: 0.5, unit: 'dB' },
 
   { group: 'Simulation', path: 'sim.opsPerSec', label: 'Operations per second', min: 0, max: 500, step: 1, unit: '/s' },
   { group: 'Simulation', path: 'sim.burstiness', label: 'Burstiness', min: 0, max: 1, step: 0.01 },
