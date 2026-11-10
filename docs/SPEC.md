@@ -87,7 +87,7 @@ Reference measurements behind the defaults are in section 11.
 
 - R6.1 A click is a short noise burst (default 1.5 ms, range 0.3–3 ms) fed into a bank of damped
   resonators, plus one low-frequency body resonator.
-- R6.2 Resonator bank of the default preset "laptop-2000s": 1115, 1390, 1600, 1935 and 3620 Hz
+- R6.2 Resonator bank of the "laptop-2000s" preset: 1115, 1390, 1600, 1935 and 3620 Hz
   with decay times (to −20 dB) between 5 and 10 ms; body at 175 Hz, decay 15 ms. Bank of the
   "desktop-90s" preset: 850, 1430, 2100, 3100 Hz, decay 4–12 ms; body at 300 Hz. Number of
   resonators is configurable from 2 to 8.
@@ -113,16 +113,17 @@ Reference measurements behind the defaults are in section 11.
 
 ### 6.3 Mixer
 
-- R6.11 Separate gains for head, spindle and master, each from silence to +6 dB.
+- R6.11 Separate gains for head, spindle and master, each from silence to +6 dB. Defaults: head
+  −11.5 dB, spindle 0 dB, master 0 dB.
 - R6.12 With spindle gain at silence the output is exactly the head layer, and the reverse.
 - R6.13 Output is mono. A soft limiter on the master prevents clipping. The limiter is bypassed
   for one-shot export, which is normalized instead (R10.2).
 
 ### 6.4 Presets
 
-- R6.14 Shipped presets: "laptop-2000s" (the default; 4200 rpm, crisp ticking head, tuned to the
-  primary reference in section 11) and "desktop-90s" (5400 rpm, louder and clackier head, bearing
-  whine). A preset sets every drive parameter. More may be added without a spec change, as they
+- R6.14 Shipped presets: "laptop-2000s" (4200 rpm, crisp ticking head, tuned to the primary
+  reference in section 11), "desktop-90s" (5400 rpm, louder and clackier head, bearing whine) and
+  "desktop-90s-2" (the default; the owner's tuning of "desktop-90s" with a quieter bearing whine). A preset sets every drive parameter. More may be added without a spec change, as they
   are parameter values only.
 
 ### 6.5 Filters
@@ -181,19 +182,19 @@ It applies in live mode only.
   sample included. At or below the baseline its operations are background activity; above it
   they are normal activity.
 - R8.7 Baseline mode is "off" (all activity is normal), "manual" (a slider, 0–500 operations per
-  second, default 10) or "adaptive" (the default). R8.6 applies in manual mode only.
+  second, default 16) or "adaptive" (the default). R8.6 applies in manual mode only.
 - R8.8 Adaptive mode uses no threshold. It keeps an activity level between 0 % and 100 %,
   starting at 0 %:
   - During every statistics sample that contains operations the level rises, at a rate that
-    takes it from 0 % to 100 % in the ramp-up time of uninterrupted activity (default 1.5 s,
+    takes it from 0 % to 100 % in the ramp-up time of uninterrupted activity (default 0.4 s,
     range 0.1–10 s).
   - During every sample without operations it falls, at a rate that takes it from 100 % to 0 %
-    in the cooldown time (default 10 s, range 1–120 s).
+    in the cooldown time (default 8 s, range 1–120 s).
   A single short burst therefore stays quiet, bursts that follow each other within the cooldown
   add up, and sustained activity reaches the normal level.
 - R8.9 Background activity passes through the drive model like normal activity, with two
-  differences: the light rises only to the background brightness (default 15 %, range 0–100 %),
-  and clicks play at the background click level relative to normal clicks (default −18 dB, range
+  differences: the light rises only to the background brightness (default 28 %, range 0–100 %),
+  and clicks play at the background click level relative to normal clicks (default −15.5 dB, range
   silence to 0 dB). In adaptive mode all activity is treated this way, with both values moved
   towards normal by the activity level: the brightness limit in a straight line from the
   background brightness to 100 %, the click level in a straight line in dB from the background
@@ -219,7 +220,7 @@ It applies in live mode only.
 On a real system writes are collected in memory and flushed in bursts to places close together,
 while reads happen on demand and jump around.
 
-- R9.5 A switch "read/write pattern", off by default. Off: reads and writes are treated the
+- R9.5 A switch "read/write pattern", on by default. Off: reads and writes are treated the
   same, as in R9.1. It is independent of the head sound mode (R6.20).
 - R9.6 On, in live and in simulation mode: the seek-distance spread of R9.1 is replaced by a
   read seek spread (default 0.9) and a write seek spread (default 0.5), both 0–1, and seeks of
@@ -311,7 +312,7 @@ This is the reference the owner rates best. The "laptop-2000s" preset is tuned t
 - A2 With the baseline off, live mode reacts to a real disk load within 200 ms and returns to
   idle when the load ends. With a manual baseline, a load of at least five times the baseline is
   rated normal within 250 ms. In adaptive mode an uninterrupted load reaches the normal level
-  within the ramp-up time plus 100 ms, and with the default
-  settings a single burst of 100 ms from rest stays below 10 %.
+  within the ramp-up time plus 100 ms, and a single burst
+  from rest raises the level by no more than its length divided by the ramp-up time.
 - A3 The owner judges realism by ear against the reference collection. Parameter retuning that
   stays inside the ranges in this spec is not a spec change.
