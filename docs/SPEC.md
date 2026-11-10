@@ -114,7 +114,8 @@ Reference measurements behind the defaults are in section 11.
 ### 6.3 Mixer
 
 - R6.11 Separate gains for head, spindle and master, each from silence to +6 dB. Defaults: head
-  −11.5 dB, spindle 0 dB, master −6 dB. The page calls the master gain "Master volume".
+  −11.5 dB ("laptop-2000s") or −8 dB ("desktop-90s" and "desktop-90s-2"), spindle 0 dB, master
+  −6 dB. The page calls the master gain "Master volume".
 - R6.12 With spindle gain at silence the output is exactly the head layer, and the reverse.
 - R6.13 Output is mono. A soft limiter on the master prevents clipping. The limiter is bypassed
   for one-shot export, which is normalized instead (R10.2).
