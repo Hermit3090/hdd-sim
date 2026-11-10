@@ -20,6 +20,10 @@ npm start
 Then open http://127.0.0.1:8125/ and press **Spin up**. Use `npm start -- --port 9000` for
 another port. The server only listens on this computer and only reads disk statistics.
 
+The preset selector also lists the parameter files in `presets/`, under their file names. Save
+a file there with "Save parameters (JSON)" and it appears in the list. To use another folder:
+`npm start -- --presets ~/my-hdd-presets`. The server only reads from that folder.
+
 - **Live** (the start mode) follows the disks of this computer. Real activity passes through the emulated drive, so
   an SSD still produces the pulsing pattern of a hard drive.
 - **Simulation** plays a scenario; every parameter can be changed while it runs.

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Local server (spec section 8): serves the page and the synth core, and
 // streams disk statistics. Loopback only, read only.
-//   node src/server/server.js [--port 8125]
+//   node src/server/server.js [--port 8125] [--presets <folder>]
 
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, lstatSync, readdirSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { dirname, extname, join, normalize, sep } from 'node:path';
+import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSampler } from './diskstats.js';
 
@@ -14,6 +14,29 @@ export const DEFAULT_PORT = 8125;
 export const SAMPLE_HZ = 20;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+export const DEFAULT_PRESETS_DIR = join(ROOT, 'presets');
+// R8.13: plain file names only, so a name can never leave the preset folder.
+const PRESET_NAME = /^[A-Za-z0-9_-][A-Za-z0-9 ._-]*\.json$/;
+const PRESET_MAX_BYTES = 1024 * 1024;
+
+// A preset file is a regular file (not a link) directly in the folder.
+function isPresetFile(dir, name) {
+  if (!PRESET_NAME.test(name)) return false;
+  try {
+    const info = lstatSync(join(dir, name));
+    return info.isFile() && info.size <= PRESET_MAX_BYTES;
+  } catch {
+    return false;
+  }
+}
+
+function listPresets(dir) {
+  try {
+    return readdirSync(dir).filter((name) => isPresetFile(dir, name)).sort();
+  } catch {
+    return []; // no folder, no presets
+  }
+}
 // URL prefix -> directory. Nothing outside these two directories is served.
 const MOUNTS = [
   ['/dsp/', join(ROOT, 'src', 'dsp')],
@@ -52,10 +75,11 @@ function resolveFile(urlPath) {
 }
 
 /**
- * @param {{port?: number, sampler?: () => object|null}} [options]
+ * @param {{port?: number, sampler?: () => object|null, presetsDir?: string}} [options]
  * @returns {import('node:http').Server} not yet listening
  */
-export function createHddSimServer({ port = DEFAULT_PORT, sampler = createSampler() } = {}) {
+export function createHddSimServer({ port = DEFAULT_PORT, sampler = createSampler(), presetsDir = DEFAULT_PRESETS_DIR } = {}) {
+  const presets = resolve(presetsDir);
   const clients = new Set();
   let timer = null;
   let last = 0;
@@ -114,6 +138,28 @@ export function createHddSimServer({ port = DEFAULT_PORT, sampler = createSample
       return;
     }
 
+    // R8.12, R8.13: the preset folder, read only.
+    if (path.startsWith('/presets/')) {
+      const send = (status, type, body) => {
+        res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+        res.end(req.method === 'HEAD' ? undefined : body);
+      };
+      let name = null;
+      try {
+        name = decodeURIComponent(path.slice('/presets/'.length));
+      } catch {
+        /* a malformed name is not found */
+      }
+      if (name === '') send(200, TYPES['.json'], JSON.stringify(listPresets(presets)));
+      else if (name === null || !isPresetFile(presets, name)) send(404, 'text/plain', 'Not found');
+      else {
+        res.writeHead(200, { 'Content-Type': TYPES['.json'], 'Cache-Control': 'no-store' });
+        if (req.method === 'HEAD') res.end();
+        else createReadStream(join(presets, name)).pipe(res);
+      }
+      return;
+    }
+
     const file = resolveFile(path);
     if (!file) {
       res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found');
@@ -133,11 +179,13 @@ export function createHddSimServer({ port = DEFAULT_PORT, sampler = createSample
 
 function main() {
   let port = Number(process.env.PORT) || DEFAULT_PORT;
+  let presetsDir = DEFAULT_PRESETS_DIR;
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--port' && args[i + 1]) port = Number(args[++i]);
+    else if (args[i] === '--presets' && args[i + 1]) presetsDir = args[++i];
     else {
-      console.error('Usage: node src/server/server.js [--port 8125]');
+      console.error('Usage: node src/server/server.js [--port 8125] [--presets <folder>]');
       process.exit(2);
     }
   }
@@ -145,12 +193,15 @@ function main() {
     console.error('The port must be a whole number between 1 and 65535.');
     process.exit(2);
   }
-  const server = createHddSimServer({ port });
+  const server = createHddSimServer({ port, presetsDir });
   server.on('error', (err) => {
     console.error(err.code === 'EADDRINUSE' ? `Port ${port} is already in use. Try --port with another number.` : err.message);
     process.exit(1);
   });
-  server.listen(port, HOST, () => console.log(`hdd-sim is running at http://${HOST}:${port}/`));
+  server.listen(port, HOST, () => {
+    console.log(`hdd-sim is running at http://${HOST}:${port}/`);
+    console.log(`Preset folder (read only): ${resolve(presetsDir)}`);
+  });
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === normalize(process.argv[1])) main();

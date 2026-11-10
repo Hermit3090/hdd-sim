@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { createSampler, delta, parseDiskstats, wholeDisks } from '../src/server/diskstats.js';
 import { HOST, SAMPLE_HZ, createHddSimServer } from '../src/server/server.js';
@@ -36,6 +39,8 @@ test('R8.5: the sampler reports unavailable statistics as null', () => {
 let server;
 let port;
 let ticks = 0;
+let presetsDir;
+let secretDir;
 
 function get(path, { method = 'GET', host } = {}) {
   return new Promise((resolve, reject) => {
@@ -51,12 +56,28 @@ function get(path, { method = 'GET', host } = {}) {
 
 before(async () => {
   const sampler = () => ({ sda: [ticks++, 1, 4096, 512] });
-  server = createHddSimServer({ sampler });
+  // A preset folder with two good files and everything that must be refused.
+  presetsDir = mkdtempSync(join(tmpdir(), 'hdd-sim-presets-'));
+  writeFileSync(join(presetsDir, 'my drive 2.json'), '{"seed":7}');
+  writeFileSync(join(presetsDir, 'a-first.json'), '{"seed":1}');
+  writeFileSync(join(presetsDir, 'notes.txt'), 'no');
+  writeFileSync(join(presetsDir, '.hidden.json'), '{}');
+  writeFileSync(join(presetsDir, 'bad;name.json'), '{}');
+  writeFileSync(join(presetsDir, 'huge.json'), 'x'.repeat(1024 * 1024 + 1));
+  mkdirSync(join(presetsDir, 'folder.json'));
+  mkdirSync(join(presetsDir, 'sub'));
+  writeFileSync(join(presetsDir, 'sub', 'inner.json'), '{}');
+  secretDir = mkdtempSync(join(tmpdir(), 'hdd-sim-outside-'));
+  writeFileSync(join(secretDir, 'secret.json'), '{"secret":true}');
+  symlinkSync(join(secretDir, 'secret.json'), join(presetsDir, 'link.json'));
+  server = createHddSimServer({ sampler, presetsDir });
   await new Promise((resolve) => server.listen(0, HOST, resolve));
   port = server.address().port;
 });
 
 after(() => new Promise((resolve) => {
+  rmSync(presetsDir, { recursive: true, force: true });
+  rmSync(secretDir, { recursive: true, force: true });
   server.closeAllConnections();
   server.close(resolve);
 }));
@@ -91,6 +112,50 @@ test('R8.1: there are no write endpoints', async () => {
   for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
     assert.equal((await get('/', { method })).status, 405, method);
     assert.equal((await get('/stats', { method })).status, 405, method);
+    assert.equal((await get('/presets/', { method })).status, 405, method);
+    assert.equal((await get('/presets/new.json', { method })).status, 405, method);
+  }
+});
+
+test('R8.12, R8.13: the preset folder is listed and its parameter files are served', async () => {
+  const list = await get('/presets/');
+  assert.equal(list.status, 200);
+  assert.match(list.type, /application\/json/);
+  assert.deepEqual(JSON.parse(list.body), ['a-first.json', 'my drive 2.json']);
+  const file = await get('/presets/my%20drive%202.json');
+  assert.equal(file.status, 200);
+  assert.match(file.type, /application\/json/);
+  assert.deepEqual(JSON.parse(file.body), { seed: 7 });
+  assert.equal((await get('/presets/a-first.json', { method: 'HEAD' })).body, '');
+});
+
+test('R8.13: other names, links, sub-folders, large files and paths out of the folder are refused', async () => {
+  for (const path of [
+    '/presets/notes.txt', '/presets/.hidden.json', '/presets/bad%3Bname.json', '/presets/huge.json',
+    '/presets/folder.json', '/presets/sub/inner.json', '/presets/sub%2Finner.json', '/presets/link.json',
+    '/presets/..%2Fpackage.json', '/presets/../package.json', '/presets/%2e%2e%2f%2e%2e%2fpackage.json',
+    '/presets/missing.json', '/presets/%zz', '/presets/a-first.json%00.txt', '/presets',
+  ]) {
+    const res = await get(path);
+    assert.equal(res.status, 404, path);
+    assert.ok(!res.body.includes('secret'), path);
+  }
+});
+
+test('R8.13: a missing preset folder gives an empty list', async () => {
+  const other = createHddSimServer({ sampler: () => null, presetsDir: join(presetsDir, 'does-not-exist') });
+  await new Promise((resolve) => other.listen(0, HOST, resolve));
+  const savedPort = port;
+  port = other.address().port;
+  try {
+    const list = await get('/presets/');
+    assert.equal(list.status, 200);
+    assert.deepEqual(JSON.parse(list.body), []);
+    assert.equal((await get('/presets/a-first.json')).status, 404);
+  } finally {
+    port = savedPort;
+    other.closeAllConnections();
+    await new Promise((resolve) => other.close(resolve));
   }
 });
 

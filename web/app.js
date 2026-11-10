@@ -15,7 +15,67 @@ let params = loadStored();
 let audio = null; // { ctx, node } once sound has been started
 let mode = 'live'; // R8.11
 let pushQueued = false;
+const FILE_KEY = 'hdd-sim-file';
 let loadedFile = ''; // name of the parameter file the settings came from, if any
+let presetFiles = []; // file names in the server's preset folder (R8.14)
+try {
+  loadedFile = localStorage.getItem(FILE_KEY) || '';
+} catch {
+  /* storage may be unavailable */
+}
+
+function setLoadedFile(name) {
+  loadedFile = name;
+  try {
+    localStorage.setItem(FILE_KEY, name);
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
+// The preset selector: shipped presets, then the files of the preset folder
+// and, if it is not one of them, the file loaded by hand.
+function buildPresetSelect() {
+  const select = $('preset');
+  select.textContent = '';
+  const builtIn = document.createElement('optgroup');
+  builtIn.label = 'Built-in';
+  for (const name of PRESET_NAMES) builtIn.append(new Option(name, name));
+  select.append(builtIn);
+  const names = presetFiles.includes(loadedFile) || !loadedFile ? presetFiles : [...presetFiles, loadedFile];
+  if (names.length > 0) {
+    const files = document.createElement('optgroup');
+    files.label = 'Files';
+    for (const name of names) files.append(new Option(name.replace(/\.json$/i, ''), `file:${name}`));
+    select.append(files);
+  }
+  select.value = loadedFile ? `file:${loadedFile}` : params.preset;
+}
+
+async function refreshPresetFiles() {
+  let names = [];
+  try {
+    const res = await fetch('/presets/');
+    if (res.ok) names = (await res.json()).filter((n) => typeof n === 'string');
+  } catch {
+    /* without the list the selector shows the shipped presets only */
+  }
+  if (names.join('\n') === presetFiles.join('\n')) return;
+  presetFiles = names;
+  buildPresetSelect();
+}
+
+// Takes over a parsed parameter file. The master volume is the listener's.
+function loadParamsObject(loaded, name) {
+  if (loaded === null || typeof loaded !== 'object' || Array.isArray(loaded)) throw new Error('not a parameter object');
+  const masterDb = params.mix.masterDb;
+  params = sanitizeParams(loaded);
+  params.mix.masterDb = masterDb;
+  setLoadedFile(name);
+  refreshAll();
+  pushParams();
+  setParamsStatus(`Loaded ${name}.`);
+}
 
 function loadStored() {
   try {
@@ -268,11 +328,7 @@ function parseHarmonics(text) {
 /** Shows the current parameters in every control. */
 function refreshAll() {
   for (const fn of refreshers) fn();
-  // A loaded parameter file is shown under its own name (R6.14).
-  const select = $('preset');
-  for (const option of [...select.options]) if (option.value.startsWith('file:')) option.remove();
-  if (loadedFile) select.append(new Option(loadedFile.replace(/\.json$/i, ''), `file:${loadedFile}`));
-  select.value = loadedFile ? `file:${loadedFile}` : params.preset;
+  buildPresetSelect();
   $('scenario').value = params.scenario;
   $('export-scenario').value = params.export.burstScenario;
   $('export-rate').value = params.export.sampleRate;
@@ -465,11 +521,12 @@ function setParamsStatus(text, isError = false) {
 
 function init() {
   buildControls();
-  fillSelect($('preset'), PRESET_NAMES);
   fillSelect($('scenario'), SCENARIO_NAMES);
   fillSelect($('export-scenario'), SCENARIO_NAMES);
   refreshAll();
   setMode(mode);
+  refreshPresetFiles();
+  for (const type of ['focus', 'pointerdown']) $('preset').addEventListener(type, refreshPresetFiles);
 
   $('spin-up').addEventListener('click', () => spin(true));
   $('spin-down').addEventListener('click', () => spin(false));
@@ -510,9 +567,21 @@ function init() {
   }
 
   $('preset').addEventListener('change', () => {
-    if ($('preset').value.startsWith('file:')) return;
-    loadedFile = '';
-    applyPreset(params, $('preset').value);
+    const choice = $('preset').value;
+    if (choice.startsWith('file:')) {
+      const name = choice.slice(5);
+      if (!presetFiles.includes(name)) return; // loaded by hand; there is nothing to read again
+      fetch(`/presets/${encodeURIComponent(name)}`)
+        .then((res) => (res.ok ? res.json() : Promise.reject(new Error('the server did not return it'))))
+        .then((loaded) => loadParamsObject(loaded, name))
+        .catch((err) => {
+          setParamsStatus(`${name} could not be loaded: ${err.message}`, true);
+          buildPresetSelect();
+        });
+      return;
+    }
+    setLoadedFile('');
+    applyPreset(params, choice);
     refreshAll();
     pushParams();
   });
@@ -568,15 +637,7 @@ function init() {
     $('params-file').value = '';
     if (!file) return;
     try {
-      const loaded = JSON.parse(await file.text());
-      if (loaded === null || typeof loaded !== 'object' || Array.isArray(loaded)) throw new Error('not a parameter object');
-      const masterDb = params.mix.masterDb; // the listening level is not the file's to change
-      params = sanitizeParams(loaded);
-      params.mix.masterDb = masterDb;
-      loadedFile = file.name;
-      refreshAll();
-      pushParams();
-      setParamsStatus(`Loaded ${file.name}.`);
+      loadParamsObject(JSON.parse(await file.text()), file.name);
     } catch (err) {
       setParamsStatus(`${file.name} could not be loaded: ${err.message}`, true);
     }
@@ -586,7 +647,7 @@ function init() {
     const masterDb = params.mix.masterDb;
     params = defaultParams(preset);
     params.mix.masterDb = masterDb;
-    loadedFile = '';
+    setLoadedFile('');
     refreshAll();
     pushParams();
     setParamsStatus(`Reset to the ${preset} defaults.`);
