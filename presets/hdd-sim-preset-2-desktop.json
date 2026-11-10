@@ -1,7 +1,7 @@
 {
   "version": 2,
   "seed": 1,
-  "preset": "desktop-90s",
+  "preset": "desktop-90s-2",
   "drive": {
     "rpm": 5400,
     "settleMs": 2,
@@ -78,9 +78,9 @@
     "unlockClicks": true
   },
   "mix": {
-    "headDb": -9,
-    "spindleDb": 2.5,
-    "masterDb": 0
+    "headDb": -11.5,
+    "spindleDb": 0,
+    "masterDb": -6
   },
   "light": {
     "onMs": 2,
@@ -94,11 +94,11 @@
   },
   "filters": {
     "hpMode": "combined",
-    "lpMode": "combined",
+    "lpMode": "separate",
     "hp": {
       "all": {
-        "on": false,
-        "hz": 120,
+        "on": true,
+        "hz": 151,
         "resDb": 0,
         "slope": 12
       },
@@ -110,7 +110,7 @@
       },
       "motor": {
         "on": false,
-        "hz": 120,
+        "hz": 116,
         "resDb": 0,
         "slope": 12
       },
@@ -129,32 +129,32 @@
     },
     "lp": {
       "all": {
-        "on": false,
-        "hz": 8000,
+        "on": true,
+        "hz": 8551,
         "resDb": 0,
         "slope": 12
       },
       "head": {
-        "on": false,
-        "hz": 8000,
-        "resDb": 0,
+        "on": true,
+        "hz": 3606,
+        "resDb": 1.5,
         "slope": 12
       },
       "motor": {
-        "on": false,
-        "hz": 8000,
+        "on": true,
+        "hz": 5848,
         "resDb": 0,
         "slope": 12
       },
       "air": {
-        "on": false,
-        "hz": 8000,
+        "on": true,
+        "hz": 9100,
         "resDb": 0,
         "slope": 12
       },
       "whine": {
-        "on": false,
-        "hz": 8000,
+        "on": true,
+        "hz": 10966,
         "resDb": 0,
         "slope": 12
       }
