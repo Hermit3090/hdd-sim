@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "seed": 1,
+  "preset": "laptop-2000s",
+  "drive": {
+    "rpm": 4200,
+    "settleMs": 2,
+    "fullStrokeMs": 22,
+    "transferMBps": 8,
+    "queueMax": 64,
+    "maxTransferMs": 30,
+    "idleRecal": true,
+    "idleAfterS": 5,
+    "recalMinS": 20,
+    "recalMaxS": 60
+  },
+  "click": {
+    "levelDb": -11,
+    "burstMs": 1.5,
+    "resonators": [
+      {
+        "freq": 1115,
+        "decayMs": 9,
+        "gainDb": -3
+      },
+      {
+        "freq": 1390,
+        "decayMs": 10,
+        "gainDb": 0
+      },
+      {
+        "freq": 1600,
+        "decayMs": 8,
+        "gainDb": -1.5
+      },
+      {
+        "freq": 1935,
+        "decayMs": 9,
+        "gainDb": 0
+      },
+      {
+        "freq": 3620,
+        "decayMs": 6,
+        "gainDb": 0
+      },
+      {
+        "freq": 2500,
+        "decayMs": 6,
+        "gainDb": -6
+      },
+      {
+        "freq": 2500,
+        "decayMs": 6,
+        "gainDb": -6
+      }
+    ],
+    "body": {
+      "freq": 237,
+      "decayMs": 14,
+      "gainDb": -19.5
+    },
+    "varFreqPct": 4,
+    "varLevelDb": 3,
+    "varDecayPct": 20,
+    "pairThreshold": 0.3,
+    "distLevelDb": 3,
+    "brightnessDb": 4
+  },
+  "spindle": {
+    "motorDb": -24,
+    "harmonics": [
+      {
+        "n": 1,
+        "db": 0
+      },
+      {
+        "n": 10,
+        "db": -25
+      },
+      {
+        "n": 12,
+        "db": -28
+      }
+    ],
+    "whineHz": 4300,
+    "whineDb": -60,
+    "noiseDb": -45,
+    "noiseHz": 1060,
+    "noiseQ": 0.7,
+    "wobble": 0.13,
+    "spinUpS": 4,
+    "spinDownS": 6,
+    "unlockClicks": true
+  },
+  "mix": {
+    "headDb": 0,
+    "spindleDb": 0,
+    "masterDb": 0
+  },
+  "light": {
+    "onMs": 2,
+    "offMs": 30,
+    "color": "green"
+  },
+  "scenario": "light desktop use",
+  "sim": {
+    "opsPerSec": 4,
+    "burstiness": 0.85,
+    "burstLen": 5,
+    "seekSpread": 0.7,
+    "readMix": 0.7,
+    "opSizeKB": 32
+  },
+  "export": {
+    "sampleRate": 44100,
+    "clickCount": 16,
+    "distMin": 0.05,
+    "distMax": 1,
+    "burstScenario": "light desktop use",
+    "burstSeconds": 8,
+    "loopSeconds": 4,
+    "idleSeconds": 20
+  }
+}
