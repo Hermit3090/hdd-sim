@@ -127,7 +127,10 @@ Reference measurements behind the defaults are in section 11.
   "desktop-90s-2" (the default; the owner's tuning of "desktop-90s" with a quieter bearing whine). A preset sets every
   setting of the page's Drive, Mix and Filters sections: drive model, head click, read and write
   sound, spindle, light, head and spindle volume, and all filters. The master volume is not part
-  of a preset. All of these, the master volume included, are in the parameter file (R4.5). More may be added without a spec change, as they
+  of a preset. All of these, the master volume included, are in the parameter file (R4.5).
+  Loading a parameter file in the page keeps the page's current master volume, and the preset
+  selector then shows the file's name. Saved parameter files are independent of the shipped
+  presets. More may be added without a spec change, as they
   are parameter values only.
 
 ### 6.5 Filters
