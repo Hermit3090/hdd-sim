@@ -114,7 +114,7 @@ Reference measurements behind the defaults are in section 11.
 ### 6.3 Mixer
 
 - R6.11 Separate gains for head, spindle and master, each from silence to +6 dB. Defaults: head
-  −11.5 dB, spindle 0 dB, master 0 dB.
+  −11.5 dB, spindle 0 dB, master −6 dB. The page calls the master gain "Master volume".
 - R6.12 With spindle gain at silence the output is exactly the head layer, and the reverse.
 - R6.13 Output is mono. A soft limiter on the master prevents clipping. The limiter is bypassed
   for one-shot export, which is normalized instead (R10.2).
@@ -123,7 +123,10 @@ Reference measurements behind the defaults are in section 11.
 
 - R6.14 Shipped presets: "laptop-2000s" (4200 rpm, crisp ticking head, tuned to the primary
   reference in section 11), "desktop-90s" (5400 rpm, louder and clackier head, bearing whine) and
-  "desktop-90s-2" (the default; the owner's tuning of "desktop-90s" with a quieter bearing whine). A preset sets every drive parameter. More may be added without a spec change, as they
+  "desktop-90s-2" (the default; the owner's tuning of "desktop-90s" with a quieter bearing whine). A preset sets every
+  setting of the page's Drive, Mix and Filters sections: drive model, head click, read and write
+  sound, spindle, light, head and spindle volume, and all filters. The master volume is not part
+  of a preset. All of these, the master volume included, are in the parameter file (R4.5). More may be added without a spec change, as they
   are parameter values only.
 
 ### 6.5 Filters
@@ -132,9 +135,16 @@ Reference measurements behind the defaults are in section 11.
   (20 Hz–20 kHz), resonance (a boost at the cutoff, 0–24 dB) and slope (12 or 24 dB per octave).
 - R6.16 High-pass mode is "combined" or "separate". Combined: one high-pass filter acts on all
   four sound parts. Separate: each sound part has its own high-pass filter. Low-pass mode is
-  chosen the same way, independently of the high-pass mode. Default for both: combined.
-- R6.17 Every filter is off by default. With a filter off, the output is exactly what it is
-  without that filter.
+  chosen the same way, independently of the high-pass mode. The defaults come from the preset
+  (R6.17).
+- R6.17 With a filter off, the output is exactly what it is without that filter. Preset
+  defaults, all at 12 dB per octave and without resonance unless stated:
+  - "laptop-2000s": high-pass combined, on, 150 Hz; low-pass combined, on, 4000 Hz.
+  - "desktop-90s" and "desktop-90s-2": high-pass combined, on, 150 Hz; low-pass separate, all
+    four on: head clicks 3606 Hz with 1.5 dB resonance, motor tones 5848 Hz, airflow noise
+    9100 Hz, bearing whine 1897 Hz.
+  Filters of the mode that is not selected are off, at 150 Hz (high-pass) and 4000 Hz
+  (low-pass).
 - R6.18 Filters act before the mixer gains and the limiter. R6.12 still holds.
 - R6.19 Filters apply to live sound and to every export. One-shot clicks still meet R10.2 and
   the spindle loop still repeats without a seam.
@@ -201,6 +211,7 @@ It applies in live mode only.
   click level to 0 dB. The level that counts is the one at the moment the seek starts.
 - R8.10 The page shows, in manual mode, the baseline and whether the current activity is rated
   background or normal, and in adaptive mode the activity level.
+- R8.11 The page starts in live mode.
 
 ## 9. Simulation mode
 
