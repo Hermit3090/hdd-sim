@@ -59,10 +59,6 @@ npm test
 
 ## Known deviations from the spec
 
-- **R5.4, transfer time is capped.** One operation's transfer lasts at most 30 ms (parameter
-  "Longest single transfer"). Without the cap, operations merged under R5.5 during a large copy
-  would keep the emulated drive busy for minutes after the load ended, which contradicts the
-  purpose stated in R5.5 and acceptance point A2. Awaiting the owner's decision.
 - **R10.5, identical files.** Page and command share the same code and give byte-identical files
   in Chromium. Other browsers may round sine and exponential functions differently in the last
   digit; this has not been checked.

@@ -111,8 +111,8 @@ export class DriveModel {
     const p = this.p;
     const seekS = this.seekTimeS(op.dist);
     const rotationS = this.rng() * (60 / p.rpm); // R5.4 rotational wait
-    // Deviation from R5.4, see README: one transfer is capped so that merged
-    // operations cannot keep the drive busy long after the load has ended.
+    // R5.4: one transfer is capped so that merged operations cannot keep the
+    // drive busy long after the load has ended.
     const transferS = Math.min(op.bytes / (p.transferMBps * 1e6), p.maxTransferMs / 1000);
     this.remaining = seekS + rotationS + transferS;
     this.serving = true;

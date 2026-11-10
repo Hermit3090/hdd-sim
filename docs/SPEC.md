@@ -62,8 +62,10 @@ writes. Output is a timed list of seeks and a busy signal.
   the configured distribution. Distance 0 means no seek (sequential access) and makes no click.
 - R5.3 Seek time = settle time + (full-stroke time − settle time) × √distance.
   Defaults: settle 2 ms, full stroke 22 ms.
-- R5.4 Transfer time = operation size ÷ media transfer rate, plus a rotational wait drawn
-  uniformly between 0 and one revolution. Default transfer rate: 8 MB/s.
+- R5.4 Transfer time = operation size ÷ media transfer rate, capped at the longest single
+  transfer (default 30 ms), plus a rotational wait drawn uniformly between 0 and one revolution.
+  Default transfer rate: 8 MB/s. The cap keeps operations merged under R5.5 from holding the
+  drive busy long after the load has ended.
 - R5.5 The queue has a maximum length (default 64). When it is full, new operations are merged
   into the newest queued one (its size grows). This bounds latency under SSD-level load, so heavy
   load sounds like continuous thrashing, not like a backlog that plays for minutes.
@@ -179,7 +181,7 @@ This is the reference the owner rates best. The "laptop-2000s" preset is tuned t
 
 | Property | Measured |
 |---|---|
-| Spindle fundamental | 70 Hz (4200 rpm), with a weaker tone at 59 Hz |
+| Spindle fundamental | 70 Hz (4200 rpm) |
 | Motor harmonics | 700 and 842 Hz (10th and 12th), about 25–29 dB below the fundamental |
 | Click resonances | 1115, 1390, 1600, 1935 and 3620 Hz; body at 165–190 Hz |
 | Click energy | Mostly 1.2–2.5 kHz, second region 3.5–5 kHz |
