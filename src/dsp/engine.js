@@ -172,8 +172,9 @@ export class Engine {
     }
     if (bg) {
       const lift = this.bgLift();
-      if (p.live.bgClickDb <= SILENCE_DB && lift <= 0) return;
-      db += p.live.bgClickDb * (1 - lift);
+      const bgDb = p.live.baselineMode === 'manual' ? p.live.manualBgClickDb : p.live.bgClickDb;
+      if (bgDb <= SILENCE_DB && lift <= 0) return;
+      db += bgDb * (1 - lift);
     }
     const at = offsetS * this.sr;
     this.scheduleClick(at, dist, db, pitch);
@@ -265,7 +266,8 @@ export class Engine {
     if (normalS > 0) light = 1 - (1 - light) * Math.exp(-normalS / (lp.onMs / 1000));
     if (bgS > 0) {
       // R8.9: background activity lifts the light to the background brightness only.
-      const low = this.p.live.bgLightPct / 100;
+      const live = this.p.live;
+      const low = (live.baselineMode === 'manual' ? live.manualBgLightPct : live.bgLightPct) / 100;
       const target = low + (1 - low) * this.bgLift();
       if (light < target) light = target - (target - light) * Math.exp(-bgS / (lp.onMs / 1000));
       else light = Math.max(target, light * Math.exp(-bgS / (lp.offMs / 1000)));

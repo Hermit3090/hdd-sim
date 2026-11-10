@@ -416,13 +416,13 @@ test('R8.6: a sample is rated by the operations of the last second, the sample i
 
 test('R8.7: baseline modes off, manual and adaptive; adaptive is the default', () => {
   const d = defaultParams().live;
-  assert.deepEqual(d, { baselineMode: 'adaptive', baselineOps: 16, rampUpS: 0.4, cooldownS: 8, bgLightPct: 28, bgClickDb: -15.5 });
+  assert.deepEqual(d, { baselineMode: 'adaptive', baselineOps: 99, rampUpS: 0.4, cooldownS: 8, bgLightPct: 7, bgClickDb: -18, manualBgLightPct: 15, manualBgClickDb: -7.5 });
   const off = new Baseline(liveParams({ baselineMode: 'off' }));
   for (let i = 0; i < 40; i++) assert.equal(off.sample(1, DT), false);
   const manual = new Baseline(liveParams({ baselineMode: 'manual', baselineOps: 0 }));
   assert.equal(manual.sample(1, DT), false);
-  const s = sanitizeParams({ live: { baselineMode: 'x', baselineOps: 9999, rampUpS: 0, cooldownS: 999, bgLightPct: 400, bgClickDb: 5 } }).live;
-  assert.deepEqual(s, { baselineMode: 'adaptive', baselineOps: 500, rampUpS: 0.1, cooldownS: 120, bgLightPct: 100, bgClickDb: 0 });
+  const s = sanitizeParams({ live: { baselineMode: 'x', baselineOps: 9999, rampUpS: 0, cooldownS: 999, bgLightPct: 400, bgClickDb: 5, manualBgLightPct: -3, manualBgClickDb: -99 } }).live;
+  assert.deepEqual(s, { baselineMode: 'adaptive', baselineOps: 500, rampUpS: 0.1, cooldownS: 120, bgLightPct: 100, bgClickDb: 0, manualBgLightPct: 0, manualBgClickDb: -60 });
 });
 
 test('R8.8: the activity level rises with activity over the ramp-up time and falls over the cooldown time', () => {
@@ -491,7 +491,7 @@ function liveEngine(live) {
 }
 
 test('R8.9: background activity lights the light only to the background brightness', () => {
-  const engine = liveEngine({ baselineMode: 'manual', baselineOps: 100, bgLightPct: 15 });
+  const engine = liveEngine({ baselineMode: 'manual', baselineOps: 100, manualBgLightPct: 15, bgLightPct: 90 });
   const out = new Float32Array(128);
   let top = 0;
   for (let i = 0; i < 40; i++) {
@@ -521,12 +521,12 @@ test('R8.9: background clicks play at the background click level, or not at all 
     return { ...result, light: engine.takeLight() };
   };
   const normal = run({ baselineMode: 'off' });
-  const background = run({ baselineMode: 'manual', baselineOps: 10, bgClickDb: -18 });
+  const background = run({ baselineMode: 'manual', baselineOps: 10, manualBgClickDb: -18, bgClickDb: 0 });
   const factor = Math.pow(10, -18 / 20);
   assert.ok(peakOf(normal.head) > 0.05);
   assert.ok(normal.head.every((v, i) => Math.abs(background.head[i] - v * factor) < 1e-6));
 
-  const silent = run({ baselineMode: 'manual', baselineOps: 10, bgClickDb: -60 });
+  const silent = run({ baselineMode: 'manual', baselineOps: 10, manualBgClickDb: -60, bgClickDb: 0 });
   assert.ok(silent.head.every((v) => v === 0));
   assert.ok(silent.light > 0, 'the drive model still serves the operations');
 });

@@ -32,6 +32,7 @@ a file there with "Save parameters (JSON)" and it appears in the list. To use an
 - **Idle baseline** (live mode): keeps a system's background disk activity quiet. "Adaptive"
   starts every activity dim and quiet and raises it to normal while the activity lasts (ramp-up
   time), then lets it fall back (cooldown time). "Manual" is a fixed threshold instead.
+  Each of the two modes has its own background brightness and background click level.
 - **Read/write pattern** (optional): reads scatter over the disk, writes stay close together,
   and simulated writes are flushed in bursts.
 - **Filters**: a high-pass and a low-pass, either one for everything or one per sound part (head

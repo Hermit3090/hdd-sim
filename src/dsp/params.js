@@ -147,7 +147,9 @@ export function defaultParams(preset = DEFAULT_PRESET) {
     seed: 1,
     preset: name,
     mix: { masterDb: DEFAULT_MASTER_DB },
-    live: { baselineMode: 'adaptive', baselineOps: 16, rampUpS: 0.4, cooldownS: 8, bgLightPct: 28, bgClickDb: -15.5 },
+    live: { baselineMode: 'adaptive', baselineOps: 99, rampUpS: 0.4, cooldownS: 8,
+      // R8.9: one pair per mode. bgLightPct/bgClickDb belong to adaptive mode.
+      bgLightPct: 7, bgClickDb: -18, manualBgLightPct: 15, manualBgClickDb: -7.5 },
     pattern: { on: true, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 },
     scenario: DEFAULT_SCENARIO,
     sim: scenarioParams(DEFAULT_SCENARIO),
@@ -178,8 +180,10 @@ export const SCHEMA = [
   { group: 'Baseline', path: 'live.baselineOps', label: 'Manual baseline', min: 0, max: 500, step: 1, unit: '/s' },
   { group: 'Baseline', path: 'live.rampUpS', label: 'Adaptive ramp-up time', min: 0.1, max: 10, step: 0.1, unit: 's' },
   { group: 'Baseline', path: 'live.cooldownS', label: 'Adaptive cooldown time', min: 1, max: 120, step: 1, unit: 's' },
-  { group: 'Baseline', path: 'live.bgLightPct', label: 'Background brightness', min: 0, max: 100, step: 1, unit: '%' },
-  { group: 'Baseline', path: 'live.bgClickDb', label: 'Background click level', min: -60, max: 0, step: 0.5, unit: 'dB' },
+  { group: 'Baseline', path: 'live.manualBgLightPct', label: 'Manual: background brightness', min: 0, max: 100, step: 1, unit: '%' },
+  { group: 'Baseline', path: 'live.manualBgClickDb', label: 'Manual: background click level', min: -60, max: 0, step: 0.5, unit: 'dB' },
+  { group: 'Baseline', path: 'live.bgLightPct', label: 'Adaptive: background brightness', min: 0, max: 100, step: 1, unit: '%' },
+  { group: 'Baseline', path: 'live.bgClickDb', label: 'Adaptive: background click level', min: -60, max: 0, step: 0.5, unit: 'dB' },
 
   { group: 'Pattern', path: 'pattern.on', label: 'Read/write pattern: writes flush close together, reads scatter', type: 'bool' },
   { group: 'Pattern', path: 'pattern.readSpread', label: 'Read seek spread', min: 0, max: 1, step: 0.01 },
