@@ -177,7 +177,8 @@ audible indicator.
 
 - R8.1 A local Node server serves the page and a statistics stream. It listens on 127.0.0.1 only
   (default port 8125, configurable). It has no authentication, no write endpoints, and serves no
-  files outside the project's web and synth-core directories.
+  files outside the project's web and synth-core directories, except parameter files from the
+  preset folder (R8.12).
 - R8.2 The server reads `/proc/diskstats` at 20 Hz and streams, per whole-disk device, the
   change since the previous sample: reads, writes, bytes read, bytes written. Transport is
   server-sent events.
@@ -216,6 +217,22 @@ It applies in live mode only.
 - R8.10 The page shows, in manual mode, the baseline and whether the current activity is rated
   background or normal, and in adaptive mode the activity level.
 - R8.11 The page starts in live mode.
+
+### Preset folder
+
+- R8.12 The server reads parameter files from one preset folder: `presets/` in the project by
+  default, or the folder given with `--presets <folder>` when the server is started. The page
+  cannot choose or change the folder. The server only reads from it; saving a parameter file
+  remains a browser download.
+- R8.13 `/presets/` returns the list of file names and `/presets/<name>` one file. Only files
+  directly in the folder are served, whose names end in `.json`, start with a letter, digit,
+  dash or underscore and otherwise hold only letters, digits, spaces, dots, dashes and
+  underscores, and which are at most 1 MB. Symbolic links and sub-folders are not followed. A
+  missing folder gives an empty list.
+- R8.14 The preset selector lists the shipped presets and, below them, the files of the preset
+  folder under their file names without `.json`. Choosing a file loads it as a parameter file
+  (R6.14: the master volume stays). The list is read when the page loads and again when the
+  selector is used. Without the server's list the selector shows the shipped presets only.
 
 ## 9. Simulation mode
 
@@ -323,7 +340,8 @@ This is the reference the owner rates best. The "laptop-2000s" preset is tuned t
   (one-shot format, onset, peak, silent end, length), R10.3 (loop seam), R10.5 (page core and
   command agree), R6.16–R6.19 (filter modes, exact bypass, exports), R6.20–R6.21 (write sound),
   R8.6–R8.9 (baseline rating, activity level ramp-up and cooldown, background light and click
-  level), R9.5–R9.7 (read/write pattern), R10.6 (file names).
+  level), R9.5–R9.7 (read/write pattern), R10.6 (file names), R8.12–R8.13 (preset folder: list,
+  file, refused names, links and sizes).
 - A2 With the baseline off, live mode reacts to a real disk load within 200 ms and returns to
   idle when the load ends. With a manual baseline, a load of at least five times the baseline is
   rated normal within 250 ms. In adaptive mode an uninterrupted load reaches the normal level
