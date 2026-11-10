@@ -72,7 +72,7 @@ test('R4.5: parameters survive JSON and validation fills and clamps', () => {
   }
   const p = sanitizeParams({ drive: { rpm: 99999 }, mix: { headDb: 'loud' }, click: { resonators: [{ freq: 1 }] }, bogus: 1 });
   assert.equal(p.drive.rpm, 7200);
-  assert.equal(p.mix.headDb, -11.5); // R6.11 default
+  assert.equal(p.mix.headDb, -8); // R6.11 default of the default preset
   assert.equal(p.bogus, undefined);
   assert.ok(p.click.resonators.length >= 2 && p.click.resonators.length <= 8);
   assert.deepEqual(sanitizeParams(null), defaultParams());
@@ -104,7 +104,9 @@ test('spec defaults: presets match the documented values', () => {
   // R6.14: the default preset is the owner's tuning, as saved in presets/.
   const d = defaultParams();
   assert.equal(d.preset, 'desktop-90s-2');
-  assert.deepEqual(d.mix, { headDb: -11.5, spindleDb: 0, masterDb: -6 });
+  assert.deepEqual(d.mix, { headDb: -8, spindleDb: 0, masterDb: -6 });
+  assert.equal(defaultParams('desktop-90s').mix.headDb, -8);
+  assert.equal(defaultParams('laptop-2000s').mix.headDb, -11.5);
   const saved = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'presets', 'hdd-sim-preset-2-desktop.json'), 'utf8'));
   for (const key of ['drive', 'click', 'spindle']) assert.deepEqual(d[key], saved[key], key);
   assert.deepEqual([d.spindle.whineHz, d.spindle.whineDb], [4320, -56]);

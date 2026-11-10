@@ -100,7 +100,7 @@ for (const name of Object.keys(PRESETS)) {
   Object.assign(PRESETS[name], {
     rw: { mode: 'combined', writePitchPct: -6, writeLevelDb: 0 },
     light: { onMs: 2, offMs: 30, color: 'green' },
-    mix: { headDb: -11.5, spindleDb: 0 },
+    mix: { headDb: name === 'laptop-2000s' ? -11.5 : -8, spindleDb: 0 },
     filters: { hpMode: 'combined', lpMode, hp, lp },
   });
 }

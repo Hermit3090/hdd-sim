@@ -656,7 +656,7 @@ test('R6.14: a preset sets every Drive, Mix and Filters setting, and leaves the 
     assert.deepEqual(sanitizeParams(p), p);
   }
   // R6.11 defaults, and all of it survives the parameter file.
-  assert.deepEqual(defaultParams().mix, { headDb: -11.5, spindleDb: 0, masterDb: -6 });
+  assert.deepEqual(defaultParams().mix, { headDb: -8, spindleDb: 0, masterDb: -6 });
   const edited = defaultParams();
   edited.mix = { headDb: -3, spindleDb: -7, masterDb: -12 };
   edited.filters.lp.head.hz = 2222;
