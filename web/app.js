@@ -15,6 +15,7 @@ let params = loadStored();
 let audio = null; // { ctx, node } once sound has been started
 let mode = 'live'; // R8.11
 let pushQueued = false;
+let loadedFile = ''; // name of the parameter file the settings came from, if any
 
 function loadStored() {
   try {
@@ -267,7 +268,11 @@ function parseHarmonics(text) {
 /** Shows the current parameters in every control. */
 function refreshAll() {
   for (const fn of refreshers) fn();
-  $('preset').value = params.preset;
+  // A loaded parameter file is shown under its own name (R6.14).
+  const select = $('preset');
+  for (const option of [...select.options]) if (option.value.startsWith('file:')) option.remove();
+  if (loadedFile) select.append(new Option(loadedFile.replace(/\.json$/i, ''), `file:${loadedFile}`));
+  select.value = loadedFile ? `file:${loadedFile}` : params.preset;
   $('scenario').value = params.scenario;
   $('export-scenario').value = params.export.burstScenario;
   $('export-rate').value = params.export.sampleRate;
@@ -505,6 +510,8 @@ function init() {
   }
 
   $('preset').addEventListener('change', () => {
+    if ($('preset').value.startsWith('file:')) return;
+    loadedFile = '';
     applyPreset(params, $('preset').value);
     refreshAll();
     pushParams();
@@ -563,7 +570,10 @@ function init() {
     try {
       const loaded = JSON.parse(await file.text());
       if (loaded === null || typeof loaded !== 'object' || Array.isArray(loaded)) throw new Error('not a parameter object');
+      const masterDb = params.mix.masterDb; // the listening level is not the file's to change
       params = sanitizeParams(loaded);
+      params.mix.masterDb = masterDb;
+      loadedFile = file.name;
       refreshAll();
       pushParams();
       setParamsStatus(`Loaded ${file.name}.`);
@@ -573,7 +583,10 @@ function init() {
   });
   $('params-reset').addEventListener('click', () => {
     const preset = params.preset || DEFAULT_PRESET;
+    const masterDb = params.mix.masterDb;
     params = defaultParams(preset);
+    params.mix.masterDb = masterDb;
+    loadedFile = '';
     refreshAll();
     pushParams();
     setParamsStatus(`Reset to the ${preset} defaults.`);

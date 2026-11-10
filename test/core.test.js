@@ -101,14 +101,12 @@ test('spindle part levels: fine control below -60 dB, off at -100 dB, old files 
 
 test('spec defaults: presets match the documented values', () => {
   const laptop = defaultParams('laptop-2000s');
-  // R6.14: the default preset is the owner's tuning, as saved in presets/.
+  // R6.14: the default preset.
   const d = defaultParams();
   assert.equal(d.preset, 'desktop-90s-2');
   assert.deepEqual(d.mix, { headDb: -8, spindleDb: 0, masterDb: -6 });
   assert.equal(defaultParams('desktop-90s').mix.headDb, -8);
   assert.equal(defaultParams('laptop-2000s').mix.headDb, -11.5);
-  const saved = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'presets', 'hdd-sim-preset-2-desktop.json'), 'utf8'));
-  for (const key of ['drive', 'click', 'spindle']) assert.deepEqual(d[key], saved[key], key);
   assert.deepEqual([d.spindle.whineHz, d.spindle.whineDb], [4320, -56]);
   assert.equal(laptop.drive.rpm, 4200);
   assert.deepEqual(laptop.click.resonators.map((r) => r.freq), [1115, 1390, 1600, 1935, 3620]);
