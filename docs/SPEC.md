@@ -197,7 +197,7 @@ It applies in live mode only.
   sample included. At or below the baseline its operations are background activity; above it
   they are normal activity.
 - R8.7 Baseline mode is "off" (all activity is normal), "manual" (a slider, 0–500 operations per
-  second, default 16) or "adaptive" (the default). R8.6 applies in manual mode only.
+  second, default 99) or "adaptive" (the default). R8.6 applies in manual mode only.
 - R8.8 Adaptive mode uses no threshold. It keeps an activity level between 0 % and 100 %,
   starting at 0 %:
   - During every statistics sample that contains operations the level rises, at a rate that
@@ -208,9 +208,11 @@ It applies in live mode only.
   A single short burst therefore stays quiet, bursts that follow each other within the cooldown
   add up, and sustained activity reaches the normal level.
 - R8.9 Background activity passes through the drive model like normal activity, with two
-  differences: the light rises only to the background brightness (default 28 %, range 0–100 %),
-  and clicks play at the background click level relative to normal clicks (default −15.5 dB, range
-  silence to 0 dB). In adaptive mode all activity is treated this way, with both values moved
+  differences: the light rises only to the background brightness (range 0–100 %), and clicks
+  play at the background click level relative to normal clicks (range silence to 0 dB). Manual
+  and adaptive mode each have their own pair of these two settings: manual mode defaults to
+  15 % and −7.5 dB, adaptive mode to 7 % and −18 dB. Changing one pair leaves the other
+  unchanged. In adaptive mode all activity is treated this way, with both values moved
   towards normal by the activity level: the brightness limit in a straight line from the
   background brightness to 100 %, the click level in a straight line in dB from the background
   click level to 0 dB. The level that counts is the one at the moment the seek starts.
