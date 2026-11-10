@@ -390,51 +390,67 @@ test('R8.6: a sample is rated by the operations of the last second, the sample i
 
 test('R8.7: baseline modes off, manual and adaptive; adaptive is the default', () => {
   const d = defaultParams().live;
-  assert.deepEqual(d, { baselineMode: 'adaptive', baselineOps: 10, adaptiveCeiling: 50, bgLightPct: 15, bgClickDb: -18 });
+  assert.deepEqual(d, { baselineMode: 'adaptive', baselineOps: 10, rampUpS: 1.5, cooldownS: 10, bgLightPct: 15, bgClickDb: -18 });
   const off = new Baseline(liveParams({ baselineMode: 'off' }));
   for (let i = 0; i < 40; i++) assert.equal(off.sample(1, DT), false);
   const manual = new Baseline(liveParams({ baselineMode: 'manual', baselineOps: 0 }));
   assert.equal(manual.sample(1, DT), false);
-  const s = sanitizeParams({ live: { baselineMode: 'x', baselineOps: 9999, adaptiveCeiling: 0, bgLightPct: 400, bgClickDb: 5 } }).live;
-  assert.deepEqual(s, { baselineMode: 'adaptive', baselineOps: 500, adaptiveCeiling: 1, bgLightPct: 100, bgClickDb: 0 });
+  const s = sanitizeParams({ live: { baselineMode: 'x', baselineOps: 9999, rampUpS: 0, cooldownS: 999, bgLightPct: 400, bgClickDb: 5 } }).live;
+  assert.deepEqual(s, { baselineMode: 'adaptive', baselineOps: 500, rampUpS: 0.1, cooldownS: 120, bgLightPct: 100, bgClickDb: 0 });
 });
 
-test('R8.8: the adaptive baseline is 1.5 x the 90th percentile of two minutes, after 20 seconds of data', () => {
-  const b = new Baseline(liveParams({ baselineMode: 'adaptive', baselineOps: 10, adaptiveCeiling: 50 }));
-  // An idle system: 4 operations at once, every second.
-  const second = (ops) => { for (let i = 0; i < 20; i++) b.sample(i === 0 ? ops : 0, DT); };
-  for (let s = 0; s < 19; s++) second(4);
-  assert.equal(b.baseline, 10, 'the manual value until 20 s of data');
-  for (let s = 0; s < 11; s++) second(4);
-  assert.equal(b.baseline, 6, '1.5 x 4');
-  assert.equal(b.background, true);
-
-  // A short heavier burst is normal and does not move the baseline.
-  assert.equal(b.sample(30, DT), false);
-  assert.equal(b.baseline, 6);
-
-  // Two minutes later the old values are forgotten.
-  for (let s = 0; s < 125; s++) second(8);
-  assert.equal(b.baseline, 12);
+test('R8.8: the activity level rises with activity over the ramp-up time and falls over the cooldown time', () => {
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  const b = new Baseline(liveParams({ baselineMode: 'adaptive', rampUpS: 2, cooldownS: 10 }));
+  assert.equal(b.level, 0);
+  for (let i = 0; i < 20; i++) b.sample(3, DT); // 1 s of activity
+  assert.ok(near(b.level, 0.5), `level ${b.level}`);
+  for (let i = 0; i < 20; i++) b.sample(500, DT); // the amount of activity does not matter
+  assert.ok(near(b.level, 1));
+  for (let i = 0; i < 20; i++) b.sample(1, DT);
+  assert.equal(b.level, 1); // never above 100 %
+  for (let i = 0; i < 100; i++) b.sample(0, DT); // 5 s of quiet
+  assert.ok(near(b.level, 0.5), `level ${b.level}`);
+  for (let i = 0; i < 120; i++) b.sample(0, DT);
+  assert.equal(b.level, 0); // never below 0 %
 });
 
-test('R8.8: the adaptive baseline never exceeds the ceiling, so activity above it is always normal', () => {
-  const b = new Baseline(liveParams({ baselineMode: 'adaptive', adaptiveCeiling: 50 }));
-  for (let i = 0; i < 20 * 100; i++) b.sample(5, DT); // 100 operations per second for 100 s
-  assert.equal(b.baseline, 50);
-  assert.equal(b.background, false);
-  b.setParams(liveParams({ baselineMode: 'adaptive', adaptiveCeiling: 200 }));
-  b.sample(5, DT);
-  assert.equal(b.baseline, 150);
-  assert.equal(b.background, true);
+test('R8.8: one short burst stays quiet, bursts close together add up, far apart they do not', () => {
+  const run = (gapS) => {
+    const b = new Baseline(liveParams({ baselineMode: 'adaptive' }));
+    const peaks = [];
+    for (let burst = 0; burst < 6; burst++) {
+      b.sample(20, DT);
+      b.sample(20, DT);
+      peaks.push(b.level);
+      for (let i = 0; i < gapS / DT; i++) b.sample(0, DT);
+    }
+    return peaks;
+  };
+  const close = run(0.3);
+  assert.ok(close[0] > 0 && close[0] < 0.1, `first burst ${close[0]}`);
+  for (let i = 1; i < close.length; i++) assert.ok(close[i] > close[i - 1], 'each burst is louder than the one before');
+  const apart = run(30);
+  assert.ok(apart.every((v) => Math.abs(v - apart[0]) < 1e-9), 'bursts 30 s apart all stay at the first level');
 });
 
-test('A2: with a baseline, a load of five times the baseline is rated normal within 250 ms', () => {
+test('A2: with a manual baseline, a load of five times the baseline is rated normal within 250 ms', () => {
   const b = new Baseline(liveParams({ baselineMode: 'manual', baselineOps: 4 }));
   for (let i = 0; i < 100; i++) b.sample(0, DT);
   let samples = 0;
   do samples++; while (b.sample(1, DT)); // 20 operations per second
   assert.ok(samples * DT <= 0.25 + 1e-9, `normal after ${samples * DT} s`);
+});
+
+test('A2: in adaptive mode a steady load is at the normal level within the ramp-up time plus 100 ms', () => {
+  const live = defaultParams().live;
+  const b = new Baseline(live);
+  b.sample(5, DT);
+  b.sample(5, DT);
+  assert.ok(b.level < 0.1, `a 100 ms burst from rest gives ${b.level}`);
+  let t = 2 * DT;
+  while (b.level < 1) { b.sample(5, DT); t += DT; }
+  assert.ok(t <= live.rampUpS + 0.1 + 1e-9, `full level after ${t} s`);
 });
 
 function liveEngine(live) {
@@ -486,4 +502,106 @@ test('R8.9: background clicks play at the background click level, or not at all 
   const silent = run({ baselineMode: 'manual', baselineOps: 10, bgClickDb: -60 });
   assert.ok(silent.head.every((v) => v === 0));
   assert.ok(silent.light > 0, 'the drive model still serves the operations');
+});
+
+test('R8.9: in adaptive mode light limit and click level move from background to normal with the activity level', () => {
+  const run = (level) => {
+    const engine = liveEngine({ baselineMode: 'adaptive', bgClickDb: -18, bgLightPct: 15 });
+    engine.feed(1, 400000, 0.001);
+    engine.baseline.level = level;
+    const result = layers(engine, 0.02); // the click starts here; the op is still being served
+    return { head: result.head, light: engine.light };
+  };
+  const normalEngine = liveEngine({ baselineMode: 'off' });
+  normalEngine.feed(1, 400000, 0.001);
+  const normal = layers(normalEngine, 0.02).head;
+  assert.ok(peakOf(normal) > 0.05);
+  for (const [level, db, light] of [[0, -18, 0.15], [0.5, -9, 0.575], [1, 0, 1]]) {
+    const r = run(level);
+    const factor = Math.pow(10, db / 20);
+    assert.ok(normal.every((v, i) => Math.abs(r.head[i] - v * factor) < 1e-6), `click level at ${level}`);
+    assert.ok(r.light <= light + 1e-9 && r.light > light * 0.9, `light ${r.light} at level ${level}`);
+  }
+  // At silence the click is only missing while the level is 0.
+  const quiet = (level) => {
+    const engine = liveEngine({ baselineMode: 'adaptive', bgClickDb: -60 });
+    engine.feed(1, 400000, 0.001);
+    engine.baseline.level = level;
+    return peakOf(layers(engine, 0.02).head);
+  };
+  assert.equal(quiet(0), 0);
+  assert.ok(quiet(0.5) > 0);
+});
+
+// ---------- read/write pattern ----------
+
+function watchOps(engine) {
+  const ops = [];
+  const original = engine.model.addOp.bind(engine.model);
+  engine.model.addOp = (bytes, dist, write, bg) => {
+    ops.push({ t: engine.pos / SR, dist, write: !!write });
+    original(bytes, dist, write, bg);
+  };
+  return ops;
+}
+
+test('R9.5: the read/write pattern is off by default and then changes nothing', () => {
+  assert.deepEqual(defaultParams().pattern, { on: false, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 });
+  const plain = render(thrash(), 2);
+  const offButSet = render(thrash((p) => { Object.assign(p.pattern, { readSpread: 0, writeSpread: 0, writeReach: 0.01, flushS: 0.5 }); }), 2);
+  assert.deepEqual(offButSet, plain);
+  // Independent of the head sound mode: either can be on without the other.
+  const p = sanitizeParams({ pattern: { on: true }, rw: { mode: 'combined' } });
+  assert.equal(p.pattern.on, true);
+  assert.equal(p.rw.mode, 'combined');
+});
+
+test('R9.6: each type has its own seek spread and write seeks stay within the write seek reach', () => {
+  const engine = thrash((p) => {
+    p.sim.readMix = 0.5;
+    p.sim.seekSpread = 0; // replaced by the two spreads
+    Object.assign(p.pattern, { on: true, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 0.5 });
+  });
+  const ops = watchOps(engine);
+  render(engine, 6);
+  const reads = ops.filter((o) => !o.write);
+  const writes = ops.filter((o) => o.write);
+  assert.ok(reads.length > 200 && writes.length > 200);
+  const seekShare = (list) => list.filter((o) => o.dist > 0).length / list.length;
+  assert.ok(Math.abs(seekShare(reads) - 0.9) < 0.06, `read seek share ${seekShare(reads)}`);
+  assert.ok(Math.abs(seekShare(writes) - 0.5) < 0.08, `write seek share ${seekShare(writes)}`);
+  assert.ok(writes.every((o) => o.dist <= 0.2));
+  assert.ok(reads.some((o) => o.dist > 0.5));
+
+  // The same applies to live activity.
+  const live = liveEngine({ baselineMode: 'off' });
+  live.setParams(sanitizeParams({ ...live.p, pattern: { on: true, readSpread: 1, writeSpread: 1, writeReach: 0.1 } }));
+  const liveOps = watchOps(live);
+  for (let i = 0; i < 40; i++) { live.feed(10, 40960, DT, 5); render(live, DT); }
+  assert.ok(liveOps.filter((o) => o.write).every((o) => o.dist > 0 && o.dist <= 0.1));
+  assert.ok(liveOps.filter((o) => !o.write).some((o) => o.dist > 0.3));
+});
+
+test('R9.7: simulated writes are collected and passed on together at every flush interval; reads are not delayed', () => {
+  const engine = thrash((p) => {
+    p.sim = { ...p.sim, opsPerSec: 40, burstiness: 0, readMix: 0.5 };
+    Object.assign(p.pattern, { on: true, flushS: 2 });
+  });
+  const ops = watchOps(engine);
+  render(engine, 7);
+  const writeTimes = [...new Set(ops.filter((o) => o.write).map((o) => o.t))];
+  assert.equal(writeTimes.length, 3, `writes arrive at ${writeTimes}`); // every 2 s
+  for (let i = 1; i < writeTimes.length; i++) assert.ok(Math.abs(writeTimes[i] - writeTimes[i - 1] - 2) < 0.01);
+  const perFlush = ops.filter((o) => o.write && o.t === writeTimes[1]).length;
+  assert.ok(perFlush > 20 && perFlush < 60, `${perFlush} writes in one flush`); // about 2 s x 20 writes/s
+  const readTimes = new Set(ops.filter((o) => !o.write).map((o) => o.t));
+  assert.ok(readTimes.size > 100);
+
+  // Live timing is not changed.
+  const live = liveEngine({ baselineMode: 'off' });
+  live.setParams(sanitizeParams({ ...live.p, pattern: { on: true, flushS: 30 } }));
+  const liveOps = watchOps(live);
+  live.feed(4, 4096, DT, 4);
+  render(live, 0.1);
+  assert.equal(liveOps.filter((o) => o.write).length, 4);
 });

@@ -24,8 +24,11 @@ another port. The server only listens on this computer and only reads disk stati
 - **Live** follows the disks of this computer. Real activity passes through the emulated drive, so
   an SSD still produces the pulsing pattern of a hard drive.
 - **Spindle volume at −60 dB** leaves the head sound alone, for sampling.
-- **Idle baseline** (live mode): activity at or below the baseline only dims the light up and
-  clicks quietly. "Adaptive" learns the idle level of this system; "Manual" is a fixed threshold.
+- **Idle baseline** (live mode): keeps a system's background disk activity quiet. "Adaptive"
+  starts every activity dim and quiet and raises it to normal while the activity lasts (ramp-up
+  time), then lets it fall back (cooldown time). "Manual" is a fixed threshold instead.
+- **Read/write pattern** (optional): reads scatter over the disk, writes stay close together,
+  and simulated writes are flushed in bursts.
 - **Filters**: a high-pass and a low-pass, either one for everything or one per sound part (head
   clicks, motor tones, airflow noise, bearing whine). A high-pass on the motor tones removes the
   deep rumble on headphones.

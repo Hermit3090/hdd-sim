@@ -1,12 +1,7 @@
-// Idle baseline for live mode (spec R8.6-R8.8): rates each statistics sample
-// as background or normal activity.
+// Idle baseline for live mode (spec R8.6-R8.8): a threshold in manual mode,
+// an activity level that ramps up and cools down in adaptive mode.
 
 const RATE_WINDOW_S = 1;
-const HISTORY_S = 120;
-const WARMUP_S = 20;
-const PERCENTILE = 0.9;
-const FACTOR = 1.5;
-const MAX_SAMPLES = 8192; // bounds memory if samples arrive faster than expected
 
 export class Baseline {
   /** @param {object} live live-mode parameters */
@@ -21,18 +16,18 @@ export class Baseline {
 
   reset() {
     this.recent = []; // {ops, dt} of the last second
-    this.history = []; // {rate, dt}: operations-per-second values of the last two minutes
-    this.historyS = 0;
     this.baseline = 0;
     this.rate = 0;
     this.background = false;
+    this.level = 0; // adaptive mode: activity level 0..1 (R8.8)
   }
 
   /**
    * Takes one statistics sample and rates it.
    * @param {number} ops operations in the sample
    * @param {number} dt seconds the sample covers
-   * @returns {boolean} true if the sample is background activity
+   * @returns {boolean} true if the sample's operations get the background
+   *   treatment of R8.9 (in adaptive mode: always, scaled by the level)
    */
   sample(ops, dt) {
     // R8.6: operations in the last second, this sample included.
@@ -50,29 +45,22 @@ export class Baseline {
     recent.splice(0, first);
     this.rate = sum;
 
-    const history = this.history;
-    history.push({ rate: sum, dt });
-    this.historyS += dt;
-    while (history.length > 1 && (this.historyS - history[0].dt >= HISTORY_S || history.length > MAX_SAMPLES)) {
-      this.historyS -= history.shift().dt;
-    }
-
     const p = this.p;
-    if (p.baselineMode === 'off') {
+    if (p.baselineMode === 'adaptive') {
+      // R8.8: up while there is activity, down while there is none.
+      const step = ops > 0 ? dt / p.rampUpS : -dt / p.cooldownS;
+      this.level = Math.min(1, Math.max(0, this.level + step));
+      this.baseline = 0;
+      this.background = true;
+    } else if (p.baselineMode === 'manual') {
+      this.level = 0;
+      this.baseline = p.baselineOps;
+      this.background = sum <= this.baseline;
+    } else {
+      this.level = 0;
       this.baseline = 0;
       this.background = false;
-    } else {
-      this.baseline = p.baselineMode === 'adaptive' && this.historyS >= WARMUP_S
-        ? Math.min(p.adaptiveCeiling, FACTOR * this.percentile())
-        : p.baselineOps;
-      this.background = sum <= this.baseline;
     }
     return this.background;
-  }
-
-  // Nearest-rank percentile of the stored operations-per-second values.
-  percentile() {
-    const values = Float64Array.from(this.history, (h) => h.rate).sort();
-    return values[Math.max(0, Math.ceil(PERCENTILE * values.length) - 1)];
   }
 }

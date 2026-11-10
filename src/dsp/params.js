@@ -117,7 +117,8 @@ export function defaultParams(preset = DEFAULT_PRESET) {
       hp: filterSet(120),
       lp: filterSet(8000),
     },
-    live: { baselineMode: 'adaptive', baselineOps: 10, adaptiveCeiling: 50, bgLightPct: 15, bgClickDb: -18 },
+    live: { baselineMode: 'adaptive', baselineOps: 10, rampUpS: 1.5, cooldownS: 10, bgLightPct: 15, bgClickDb: -18 },
+    pattern: { on: false, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 },
     scenario: DEFAULT_SCENARIO,
     sim: scenarioParams(DEFAULT_SCENARIO),
     export: {
@@ -145,9 +146,16 @@ export const SCHEMA = [
   { group: 'Write sound', path: 'rw.writeLevelDb', label: 'Write click level offset', min: -12, max: 12, step: 0.5, unit: 'dB' },
 
   { group: 'Baseline', path: 'live.baselineOps', label: 'Manual baseline', min: 0, max: 500, step: 1, unit: '/s' },
-  { group: 'Baseline', path: 'live.adaptiveCeiling', label: 'Adaptive ceiling', min: 1, max: 500, step: 1, unit: '/s' },
+  { group: 'Baseline', path: 'live.rampUpS', label: 'Adaptive ramp-up time', min: 0.1, max: 10, step: 0.1, unit: 's' },
+  { group: 'Baseline', path: 'live.cooldownS', label: 'Adaptive cooldown time', min: 1, max: 120, step: 1, unit: 's' },
   { group: 'Baseline', path: 'live.bgLightPct', label: 'Background brightness', min: 0, max: 100, step: 1, unit: '%' },
   { group: 'Baseline', path: 'live.bgClickDb', label: 'Background click level', min: -60, max: 0, step: 0.5, unit: 'dB' },
+
+  { group: 'Pattern', path: 'pattern.on', label: 'Read/write pattern: writes flush close together, reads scatter', type: 'bool' },
+  { group: 'Pattern', path: 'pattern.readSpread', label: 'Read seek spread', min: 0, max: 1, step: 0.01 },
+  { group: 'Pattern', path: 'pattern.writeSpread', label: 'Write seek spread', min: 0, max: 1, step: 0.01 },
+  { group: 'Pattern', path: 'pattern.writeReach', label: 'Write seek reach', min: 0.01, max: 1, step: 0.01 },
+  { group: 'Pattern', path: 'pattern.flushS', label: 'Flush interval (simulation)', min: 0.5, max: 30, step: 0.5, unit: 's' },
 
   { group: 'Head click', path: 'click.levelDb', label: 'Click level', min: -30, max: 6, step: 0.5, unit: 'dB' },
   { group: 'Head click', path: 'click.burstMs', label: 'Noise burst length', min: 0.3, max: 3, step: 0.05, unit: 'ms' },

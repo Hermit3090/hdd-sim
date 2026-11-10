@@ -46,6 +46,7 @@ class HddSimProcessor extends AudioWorkletProcessor {
         baseline: e.baseline.baseline,
         rate: e.baseline.rate,
         background: e.baseline.background,
+        level: e.baseline.level,
       });
     }
     return true;

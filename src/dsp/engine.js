@@ -50,6 +50,8 @@ export class Engine {
     this.pos = 0; // samples produced so far
     this.simEnabled = false;
     this.feeds = [];
+    this.heldWrites = []; // sizes of simulated writes waiting for the next flush (R9.7)
+    this.flushIn = 0;
     this.light = 0;
     this.lightSum = 0;
     this.lightCount = 0;
@@ -76,6 +78,7 @@ export class Engine {
   setSimEnabled(on) {
     this.simEnabled = !!on;
     if (!on) this.activity.wait = 0;
+    else this.baseline.reset(); // live history means nothing after a pause
   }
 
   /** Starts the spindle. With immediate = true it is at speed at once. */
@@ -90,6 +93,7 @@ export class Engine {
     this.model.ready = false;
     this.model.reset();
     this.feeds.length = 0;
+    this.heldWrites.length = 0;
     this.spindle.stop(immediate);
     if (wasSpinning && !immediate) this.scheduleClick(0, 1, 0);
   }
@@ -125,10 +129,23 @@ export class Engine {
     return v;
   }
 
-  drawDist() {
-    const spread = this.p.sim.seekSpread;
+  // R9.6: with the read/write pattern on, each type has its own spread and
+  // writes stay within the write seek reach.
+  drawDist(write = false) {
+    const pattern = this.p.pattern;
+    let spread = this.p.sim.seekSpread;
+    let reach = 1;
+    if (pattern.on) {
+      spread = write ? pattern.writeSpread : pattern.readSpread;
+      if (write) reach = pattern.writeReach;
+    }
     if (this.rngModel() >= spread) return 0;
-    return Math.max(0.005, Math.abs(this.rngModel() - this.rngModel()));
+    return Math.max(0.005, Math.abs(this.rngModel() - this.rngModel()) * reach);
+  }
+
+  // R8.9: how far background treatment is lifted towards normal (0..1).
+  bgLift() {
+    return this.p.live.baselineMode === 'adaptive' ? this.baseline.level : 0;
   }
 
   scheduleClick(offsetSamples, dist, extraDb, pitch = 1) {
@@ -152,8 +169,9 @@ export class Engine {
       pitch = 1 + p.rw.writePitchPct / 100;
     }
     if (bg) {
-      if (p.live.bgClickDb <= SILENCE_DB) return;
-      db += p.live.bgClickDb;
+      const lift = this.bgLift();
+      if (p.live.bgClickDb <= SILENCE_DB && lift <= 0) return;
+      db += p.live.bgClickDb * (1 - lift);
     }
     const at = offsetS * this.sr;
     this.scheduleClick(at, dist, db, pitch);
@@ -198,7 +216,18 @@ export class Engine {
     const model = this.model;
 
     if (this.simEnabled) {
-      this.activity.advance(dt, (bytes, isWrite) => model.addOp(bytes, this.drawDist(), isWrite));
+      const hold = this.p.pattern.on;
+      this.activity.advance(dt, (bytes, isWrite) => {
+        if (hold && isWrite) this.heldWrites.push(bytes);
+        else model.addOp(bytes, this.drawDist(isWrite), isWrite);
+      });
+      // R9.7: collected writes go to the drive together at every flush interval.
+      this.flushIn = Math.min(this.flushIn, this.p.pattern.flushS) - dt;
+      if (!hold || this.flushIn <= 0) {
+        for (const bytes of this.heldWrites) model.addOp(bytes, this.drawDist(true), true);
+        this.heldWrites.length = 0;
+        if (this.flushIn <= 0) this.flushIn += this.p.pattern.flushS;
+      }
     }
     for (let i = 0; i < this.feeds.length; i++) {
       const f = this.feeds[i];
@@ -210,7 +239,7 @@ export class Engine {
         f.writeAcc += f.writeShare;
         const isWrite = f.writeAcc >= 1 - 1e-9;
         if (isWrite) f.writeAcc -= 1;
-        model.addOp(f.size, this.drawDist(), isWrite, f.bg);
+        model.addOp(f.size, this.drawDist(isWrite), isWrite, f.bg);
       }
     }
     if (this.feeds.length > 0 && this.feeds[0].left <= 0) {
@@ -226,7 +255,8 @@ export class Engine {
     if (normalS > 0) light = 1 - (1 - light) * Math.exp(-normalS / (lp.onMs / 1000));
     if (bgS > 0) {
       // R8.9: background activity lifts the light to the background brightness only.
-      const target = this.p.live.bgLightPct / 100;
+      const low = this.p.live.bgLightPct / 100;
+      const target = low + (1 - low) * this.bgLift();
       if (light < target) light = target - (target - light) * Math.exp(-bgS / (lp.onMs / 1000));
       else light = Math.max(target, light * Math.exp(-bgS / (lp.offMs / 1000)));
     }

@@ -320,7 +320,9 @@ function showState(state) {
   $('drive-state').textContent = `${STATE_TEXT[state.spindle] || ''}${queue}`;
   // R8.10
   let text = 'Baseline off: all activity is normal.';
-  if (params.live.baselineMode !== 'off') {
+  if (params.live.baselineMode === 'adaptive') {
+    text = `Activity level: ${Math.round(state.level * 100)} %.`;
+  } else if (params.live.baselineMode === 'manual') {
     const rated = state.rate > 0 ? (state.background ? 'background' : 'normal') : 'none';
     text = `Baseline: ${state.baseline.toFixed(1)} operations/s. Last second: ${state.rate} operations, rated ${rated}.`;
   }

@@ -45,12 +45,12 @@
             <select id="baseline-mode">
               <option value="off">Off: all activity sounds</option>
               <option value="manual">Manual threshold</option>
-              <option value="adaptive">Adaptive: learns this system's idle level</option>
+              <option value="adaptive">Adaptive: ramps up with sustained activity</option>
             </select>
           </div>
           <div data-group="Baseline"></div>
           <p id="baseline-status" class="status"></p>
-          <p class="hint">Activity at or below the baseline only dims the light up to the background brightness and clicks at the background level (−60 dB: no clicks). Adaptive uses the manual value for the first 20 seconds and never goes above the ceiling.</p>
+          <p class="hint">Background activity lights the light only to the background brightness and clicks at the background level (−60 dB: no clicks). Manual: activity at or below the baseline is background. Adaptive: no threshold; all activity starts as background and rises to normal over the ramp-up time while it lasts, then falls back over the cooldown time.</p>
         </div>
         <div id="sim-box">
           <div class="row">
@@ -60,6 +60,11 @@
           <div data-group="Simulation"></div>
         </div>
         <p class="hint">Seek-distance spread also applies in live mode, where real seek distances are unknown.</p>
+        <details>
+          <summary>Read/write pattern</summary>
+          <div data-group="Pattern"></div>
+          <p class="hint">When on, the two spreads replace the seek-distance spread, in live mode too. The flush interval groups simulated writes into bursts; live timing is the real one.</p>
+        </details>
       </div>
 
       <div class="panel">
