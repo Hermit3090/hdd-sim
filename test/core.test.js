@@ -79,6 +79,26 @@ test('R4.5: parameters survive JSON and validation fills and clamps', () => {
   for (const item of SCHEMA) assert.notEqual(getPath(defaultParams(), item.path), undefined, item.path);
 });
 
+test('spindle part levels: fine control below -60 dB, off at -100 dB, old files keep their meaning', () => {
+  const rms = (whineDb) => {
+    const p = sanitizeParams({ spindle: { motorDb: -100, noiseDb: -100, whineDb }, preset: 'desktop-90s' });
+    const engine = new Engine(p, 48000);
+    engine.spinUp(true);
+    const out = render(engine, 0.5);
+    return Math.sqrt(out.reduce((sum, v) => sum + v * v, 0) / out.length);
+  };
+  assert.equal(rms(-100), 0);
+  const at80 = rms(-80);
+  const at60 = rms(-60);
+  assert.ok(at80 > 0 && Math.abs(20 * Math.log10(at60 / at80) - 20) < 0.5, 'the level follows the slider below -60 dB');
+
+  const old = sanitizeParams({ version: 1, spindle: { whineDb: -60, noiseDb: -45, motorDb: -24 } });
+  assert.deepEqual([old.spindle.whineDb, old.spindle.noiseDb, old.spindle.motorDb], [-100, -45, -24]);
+  assert.equal(old.version, 2);
+  assert.equal(sanitizeParams({ version: 2, spindle: { whineDb: -60 } }).spindle.whineDb, -60);
+  assert.equal(defaultParams('laptop-2000s').spindle.whineDb, -100);
+});
+
 test('spec defaults: presets match the documented values', () => {
   const laptop = defaultParams('laptop-2000s');
   assert.equal(defaultParams().preset, 'laptop-2000s');

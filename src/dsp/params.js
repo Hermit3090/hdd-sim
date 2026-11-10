@@ -3,11 +3,15 @@
 
 export const SAMPLE_RATES = [44100, 48000];
 export const SILENCE_DB = -60; // gain sliders at this value mean exact silence
+// Spindle part levels reach further down: a narrow whine at -60 dB is still
+// audible on headphones, so these need room for fine adjustment below that.
+export const PART_SILENCE_DB = -100;
+export const PARAMS_VERSION = 2;
 export const LIGHT_COLORS = ['red', 'green', 'amber'];
 
-/** dB to linear gain; at or below SILENCE_DB the gain is exactly 0. */
-export function dbToGain(db) {
-  return db <= SILENCE_DB ? 0 : Math.pow(10, db / 20);
+/** dB to linear gain; at or below the floor the gain is exactly 0. */
+export function dbToGain(db, floor = SILENCE_DB) {
+  return db <= floor ? 0 : Math.pow(10, db / 20);
 }
 
 const PRESETS = {
@@ -31,7 +35,7 @@ const PRESETS = {
     },
     spindle: {
       motorDb: -24, harmonics: [{ n: 1, db: 0 }, { n: 10, db: -25 }, { n: 12, db: -28 }],
-      whineHz: 4300, whineDb: SILENCE_DB, noiseDb: -44, noiseHz: 900, noiseQ: 0.7,
+      whineHz: 4300, whineDb: PART_SILENCE_DB, noiseDb: -44, noiseHz: 900, noiseQ: 0.7,
       wobble: 0.15, spinUpS: 4, spinDownS: 6, unlockClicks: true,
     },
   },
@@ -89,7 +93,7 @@ export function scenarioParams(name) {
 export function defaultParams(preset = DEFAULT_PRESET) {
   const name = PRESETS[preset] ? preset : DEFAULT_PRESET;
   return {
-    version: 1,
+    version: PARAMS_VERSION,
     seed: 1,
     preset: name,
     ...presetParams(name),
@@ -109,7 +113,7 @@ export function defaultParams(preset = DEFAULT_PRESET) {
 export const SCHEMA = [
   { group: 'Mix', path: 'mix.headDb', label: 'Head volume', min: -60, max: 6, step: 0.5, unit: 'dB' },
   { group: 'Mix', path: 'mix.spindleDb', label: 'Spindle volume', min: -60, max: 6, step: 0.5, unit: 'dB' },
-  { group: 'Mix', path: 'mix.masterDb', label: 'Master volume', min: -60, max: 6, step: 0.5, unit: 'dB' },
+  { group: 'Main', path: 'mix.masterDb', label: 'Main volume', min: -60, max: 6, step: 0.5, unit: 'dB' },
 
   { group: 'Simulation', path: 'sim.opsPerSec', label: 'Operations per second', min: 0, max: 500, step: 1, unit: '/s' },
   { group: 'Simulation', path: 'sim.burstiness', label: 'Burstiness', min: 0, max: 1, step: 0.01 },
@@ -131,10 +135,10 @@ export const SCHEMA = [
   { group: 'Head click', path: 'click.brightnessDb', label: 'Brightness rise with distance', min: 0, max: 12, step: 0.5, unit: 'dB/oct' },
 
   { group: 'Spindle', path: 'drive.rpm', label: 'Speed', min: 3600, max: 7200, step: 60, unit: 'rpm' },
-  { group: 'Spindle', path: 'spindle.motorDb', label: 'Motor level', min: -60, max: 0, step: 0.5, unit: 'dB' },
+  { group: 'Spindle', path: 'spindle.motorDb', label: 'Motor level', min: -100, max: 0, step: 0.5, unit: 'dB' },
   { group: 'Spindle', path: 'spindle.whineHz', label: 'Bearing whine frequency', min: 2000, max: 9000, step: 10, unit: 'Hz' },
-  { group: 'Spindle', path: 'spindle.whineDb', label: 'Bearing whine level', min: -60, max: 0, step: 0.5, unit: 'dB' },
-  { group: 'Spindle', path: 'spindle.noiseDb', label: 'Airflow noise level', min: -60, max: 0, step: 0.5, unit: 'dB' },
+  { group: 'Spindle', path: 'spindle.whineDb', label: 'Bearing whine level', min: -100, max: 0, step: 0.5, unit: 'dB' },
+  { group: 'Spindle', path: 'spindle.noiseDb', label: 'Airflow noise level', min: -100, max: 0, step: 0.5, unit: 'dB' },
   { group: 'Spindle', path: 'spindle.noiseHz', label: 'Airflow noise centre', min: 200, max: 6000, step: 10, unit: 'Hz' },
   { group: 'Spindle', path: 'spindle.noiseQ', label: 'Airflow noise sharpness', min: 0.3, max: 8, step: 0.1 },
   { group: 'Spindle', path: 'spindle.wobble', label: 'Rotation wobble', min: 0, max: 1, step: 0.01 },
@@ -208,7 +212,13 @@ function merge(base, over) {
 export function sanitizeParams(input) {
   const src = input && typeof input === 'object' ? input : {};
   const p = merge(defaultParams(typeof src.preset === 'string' ? src.preset : DEFAULT_PRESET), src);
-  p.version = 1;
+  if (src.version === 1) {
+    // Version 1 switched spindle parts off at -60 dB; that is now an audible level.
+    for (const key of ['motorDb', 'whineDb', 'noiseDb']) {
+      if (p.spindle[key] <= SILENCE_DB) p.spindle[key] = PART_SILENCE_DB;
+    }
+  }
+  p.version = PARAMS_VERSION;
   p.seed = Math.floor(clamp(num(p.seed, 1), 0, 0xffffffff));
   if (!PRESETS[p.preset]) p.preset = DEFAULT_PRESET;
   if (!SCENARIOS[p.scenario]) p.scenario = DEFAULT_SCENARIO;

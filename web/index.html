@@ -22,6 +22,7 @@
       <button id="spin-down">Spin down</button>
       <label class="check"><input id="mute" type="checkbox"> Mute sound</label>
     </div>
+    <div class="main-volume" data-group="Main"></div>
   </header>
 
   <main>
@@ -63,7 +64,7 @@
       <div class="panel">
         <h2>Mix</h2>
         <div data-group="Mix"></div>
-        <p class="hint">A volume at −60 dB is exact silence. Set Spindle volume to −60 dB to hear and export the head alone.</p>
+        <p class="hint">−60 dB is exact silence. Set Spindle volume to −60 dB to hear and export the head alone.</p>
       </div>
 
       <div class="panel">
@@ -111,6 +112,7 @@
         <details>
           <summary>Spindle</summary>
           <div data-group="Spindle"></div>
+          <p class="hint">Motor, whine and airflow levels go down to −100 dB, which switches the part off.</p>
           <div class="row">
             <label for="harmonics">Motor harmonics</label>
             <input id="harmonics" type="text" spellcheck="false">

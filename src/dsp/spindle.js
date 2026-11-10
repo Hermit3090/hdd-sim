@@ -2,7 +2,7 @@
 // narrow bearing whine, and band-limited airflow noise. Pitch and level
 // follow the rotation speed during spin-up and spin-down.
 
-import { dbToGain } from './params.js';
+import { PART_SILENCE_DB, dbToGain } from './params.js';
 
 const UNIFORM_VARIANCE = 1 / 3; // of white noise in [-1, 1)
 const WHINE_Q = 60;
@@ -62,9 +62,9 @@ export class Spindle {
   setParams(p, rpm) {
     this.p = p;
     this.f0 = rpm / 60;
-    this.motor = dbToGain(p.motorDb);
-    this.whineGain = dbToGain(p.whineDb);
-    this.noiseGain = dbToGain(p.noiseDb);
+    this.motor = dbToGain(p.motorDb, PART_SILENCE_DB);
+    this.whineGain = dbToGain(p.whineDb, PART_SILENCE_DB);
+    this.noiseGain = dbToGain(p.noiseDb, PART_SILENCE_DB);
     this.harm = p.harmonics.map((h) => ({ n: h.n, g: dbToGain(h.db) }));
   }
 
