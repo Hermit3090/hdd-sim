@@ -75,3 +75,9 @@ table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
 th { text-align: left; font-weight: 400; font-size: 12px; color: var(--dim); padding: 2px 4px 4px 0; }
 td { padding: 2px 4px 2px 0; }
 td:last-child { width: 1%; padding-right: 0; }
+.filters td { padding: 3px 6px 3px 0; white-space: nowrap; color: var(--dim); font-size: 12px; }
+.filters td:nth-child(2) { width: 40%; }
+.filters td:last-child { width: auto; }
+.filters input[type="number"] { width: 68px; }
+.filters select { width: auto; }
+.filters .check { color: var(--text); font-size: 14px; }

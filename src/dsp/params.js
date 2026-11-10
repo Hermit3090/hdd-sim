@@ -8,6 +8,10 @@ export const SILENCE_DB = -60; // gain sliders at this value mean exact silence
 export const PART_SILENCE_DB = -100;
 export const PARAMS_VERSION = 2;
 export const LIGHT_COLORS = ['red', 'green', 'amber'];
+export const FILTER_TARGETS = ['all', 'head', 'motor', 'air', 'whine']; // 'all' is the combined filter
+export const FILTER_LIMITS = { hz: [20, 20000], resDb: [0, 24], slopes: [12, 24] };
+export const SPLIT_MODES = ['combined', 'separate'];
+export const BASELINE_MODES = ['off', 'manual', 'adaptive'];
 
 /** dB to linear gain; at or below the floor the gain is exactly 0. */
 export function dbToGain(db, floor = SILENCE_DB) {
@@ -89,6 +93,13 @@ export function scenarioParams(name) {
   return clone(SCENARIOS[name] || SCENARIOS[DEFAULT_SCENARIO]);
 }
 
+// One filter per target, all off (R6.17).
+function filterSet(hz) {
+  const set = {};
+  for (const target of FILTER_TARGETS) set[target] = { on: false, hz, resDb: 0, slope: 12 };
+  return set;
+}
+
 /** A complete parameter object. */
 export function defaultParams(preset = DEFAULT_PRESET) {
   const name = PRESETS[preset] ? preset : DEFAULT_PRESET;
@@ -99,6 +110,14 @@ export function defaultParams(preset = DEFAULT_PRESET) {
     ...presetParams(name),
     mix: { headDb: 0, spindleDb: 0, masterDb: 0 },
     light: { onMs: 2, offMs: 30, color: 'green' },
+    rw: { mode: 'combined', writePitchPct: -6, writeLevelDb: 0 },
+    filters: {
+      hpMode: 'combined',
+      lpMode: 'combined',
+      hp: filterSet(120),
+      lp: filterSet(8000),
+    },
+    live: { baselineMode: 'adaptive', baselineOps: 10, adaptiveCeiling: 50, bgLightPct: 15, bgClickDb: -18 },
     scenario: DEFAULT_SCENARIO,
     sim: scenarioParams(DEFAULT_SCENARIO),
     export: {
@@ -121,6 +140,14 @@ export const SCHEMA = [
   { group: 'Simulation', path: 'sim.seekSpread', label: 'Seek-distance spread', min: 0, max: 1, step: 0.01 },
   { group: 'Simulation', path: 'sim.readMix', label: 'Read share', min: 0, max: 1, step: 0.01 },
   { group: 'Simulation', path: 'sim.opSizeKB', label: 'Mean operation size', min: 1, max: 4096, step: 1, unit: 'KB' },
+
+  { group: 'Write sound', path: 'rw.writePitchPct', label: 'Write click pitch offset', min: -20, max: 20, step: 0.5, unit: '%' },
+  { group: 'Write sound', path: 'rw.writeLevelDb', label: 'Write click level offset', min: -12, max: 12, step: 0.5, unit: 'dB' },
+
+  { group: 'Baseline', path: 'live.baselineOps', label: 'Manual baseline', min: 0, max: 500, step: 1, unit: '/s' },
+  { group: 'Baseline', path: 'live.adaptiveCeiling', label: 'Adaptive ceiling', min: 1, max: 500, step: 1, unit: '/s' },
+  { group: 'Baseline', path: 'live.bgLightPct', label: 'Background brightness', min: 0, max: 100, step: 1, unit: '%' },
+  { group: 'Baseline', path: 'live.bgClickDb', label: 'Background click level', min: -60, max: 0, step: 0.5, unit: 'dB' },
 
   { group: 'Head click', path: 'click.levelDb', label: 'Click level', min: -30, max: 6, step: 0.5, unit: 'dB' },
   { group: 'Head click', path: 'click.burstMs', label: 'Noise burst length', min: 0.3, max: 3, step: 0.05, unit: 'ms' },
@@ -225,6 +252,18 @@ export function sanitizeParams(input) {
   if (!SCENARIOS[p.export.burstScenario]) p.export.burstScenario = DEFAULT_SCENARIO;
   if (!SAMPLE_RATES.includes(p.export.sampleRate)) p.export.sampleRate = 44100;
   if (!LIGHT_COLORS.includes(p.light.color)) p.light.color = 'green';
+  if (!SPLIT_MODES.includes(p.rw.mode)) p.rw.mode = 'combined';
+  if (!BASELINE_MODES.includes(p.live.baselineMode)) p.live.baselineMode = 'adaptive';
+  for (const type of ['hp', 'lp']) {
+    if (!SPLIT_MODES.includes(p.filters[`${type}Mode`])) p.filters[`${type}Mode`] = 'combined';
+    for (const target of FILTER_TARGETS) {
+      const f = p.filters[type][target];
+      const L = FILTER_LIMITS;
+      f.hz = clamp(f.hz, L.hz[0], L.hz[1]);
+      f.resDb = clamp(f.resDb, L.resDb[0], L.resDb[1]);
+      if (!L.slopes.includes(f.slope)) f.slope = 12;
+    }
+  }
 
   const defaults = defaultParams(p.preset);
   for (const item of SCHEMA) {

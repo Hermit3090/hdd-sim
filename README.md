@@ -24,6 +24,12 @@ another port. The server only listens on this computer and only reads disk stati
 - **Live** follows the disks of this computer. Real activity passes through the emulated drive, so
   an SSD still produces the pulsing pattern of a hard drive.
 - **Spindle volume at −60 dB** leaves the head sound alone, for sampling.
+- **Idle baseline** (live mode): activity at or below the baseline only dims the light up and
+  clicks quietly. "Adaptive" learns the idle level of this system; "Manual" is a fixed threshold.
+- **Filters**: a high-pass and a low-pass, either one for everything or one per sound part (head
+  clicks, motor tones, airflow noise, bearing whine). A high-pass on the motor tones removes the
+  deep rumble on headphones.
+- **Read and write sound**: in "Separate" mode write clicks get their own pitch and level.
 
 ## Export
 
@@ -39,7 +45,9 @@ node cli/render.js --params hdd-sim-params.json --out out --only clicks
 
 Output: `click_01.wav` … `click_16.wav` (head only, at most 60 ms, peak at −1 dBFS) and
 `burst.wav`, `spinup.wav`, `spindown.wav`, `spindle_loop.wav`, `idle.wav`. All mono, 16-bit.
-The same parameters and seed always give the same files.
+With separate read and write sound the clicks are `click_read_NN.wav` and `click_write_NN.wav`.
+Filters that are switched on apply to every export. The same parameters and seed always give
+the same files.
 
 ## Tests
 

@@ -30,8 +30,9 @@ export class ClickSynth {
    * @param {() => number} rng
    * @param {number} [extraDb] level offset
    * @param {boolean} [normalize] true: peak is exactly 1, level rules are skipped
+   * @param {number} [pitch] frequency factor for every resonator (R6.20)
    */
-  render(dist, rng, extraDb = 0, normalize = false) {
+  render(dist, rng, extraDb = 0, normalize = false, pitch = 1) {
     const p = this.p;
     const sr = this.sr;
     const d = Math.min(1, Math.max(0, dist));
@@ -42,7 +43,7 @@ export class ClickSynth {
     let longest = 0;
     const addVoice = (freq, decayMs, gain) => {
       if (gain <= 0) return;
-      const f = Math.min(freq * (1 + vary(p.varFreqPct / 100)), 0.45 * sr);
+      const f = Math.min(freq * pitch * (1 + vary(p.varFreqPct / 100)), 0.45 * sr);
       const decaySamples = Math.max(1, (decayMs * (1 + vary(p.varDecayPct / 100)) / 1000) * sr);
       const r = Math.exp(-Math.LN10 / decaySamples); // amplitude falls 20 dB per decay time
       const w = (2 * Math.PI * f) / sr;

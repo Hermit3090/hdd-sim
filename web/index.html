@@ -39,6 +39,18 @@
             <select id="device"><option value="*">All devices summed</option></select>
           </div>
           <p id="live-status" class="status">Connecting…</p>
+          <h3>Idle baseline</h3>
+          <div class="row">
+            <label for="baseline-mode">Baseline</label>
+            <select id="baseline-mode">
+              <option value="off">Off: all activity sounds</option>
+              <option value="manual">Manual threshold</option>
+              <option value="adaptive">Adaptive: learns this system's idle level</option>
+            </select>
+          </div>
+          <div data-group="Baseline"></div>
+          <p id="baseline-status" class="status"></p>
+          <p class="hint">Activity at or below the baseline only dims the light up to the background brightness and clicks at the background level (−60 dB: no clicks). Adaptive uses the manual value for the first 20 seconds and never goes above the ceiling.</p>
         </div>
         <div id="sim-box">
           <div class="row">
@@ -57,7 +69,10 @@
           <input id="seek-dist" type="range" min="0.01" max="1" step="0.01" value="0.2">
           <output id="seek-dist-out">0.20</output>
         </div>
-        <div class="buttons"><button id="seek">Seek</button></div>
+        <div class="buttons">
+          <button id="seek">Seek</button>
+          <button id="seek-write" hidden>Seek (write)</button>
+        </div>
         <p class="hint">A seek longer than the two-click threshold gives a start and an end click.</p>
       </div>
 
@@ -65,6 +80,27 @@
         <h2>Mix</h2>
         <div data-group="Mix"></div>
         <p class="hint">−60 dB is exact silence. Set Spindle volume to −60 dB to hear and export the head alone.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Filters</h2>
+        <div class="row">
+          <label for="hp-mode">High-pass</label>
+          <select id="hp-mode">
+            <option value="combined">Combined: one filter for everything</option>
+            <option value="separate">Separate: one per sound part</option>
+          </select>
+        </div>
+        <table id="hp-filters" class="filters"><tbody></tbody></table>
+        <div class="row">
+          <label for="lp-mode">Low-pass</label>
+          <select id="lp-mode">
+            <option value="combined">Combined: one filter for everything</option>
+            <option value="separate">Separate: one per sound part</option>
+          </select>
+        </div>
+        <table id="lp-filters" class="filters"><tbody></tbody></table>
+        <p class="hint">Per filter: on, cutoff (20 Hz–20 kHz), resonance (0–24 dB boost at the cutoff), slope. A filter that is off changes nothing. Filters also apply to exports.</p>
       </div>
 
       <div class="panel">
@@ -88,7 +124,7 @@
           <button data-export="all">Everything (zip)</button>
         </div>
         <p id="export-status" class="status"></p>
-        <p class="hint">WAV, mono, 16-bit. One-shot clicks are always head only, peak at −1 dBFS.</p>
+        <p class="hint">WAV, mono, 16-bit. One-shot clicks are always head only, peak at −1 dBFS; the head filters apply to them.</p>
       </div>
     </section>
 
@@ -108,6 +144,18 @@
             <tbody></tbody>
           </table>
           <button id="add-resonator">Add resonator</button>
+        </details>
+        <details>
+          <summary>Read and write sound</summary>
+          <div class="row">
+            <label for="rw-mode">Head sound</label>
+            <select id="rw-mode">
+              <option value="combined">Combined: reads and writes sound the same</option>
+              <option value="separate">Separate: writes have their own sound</option>
+            </select>
+          </div>
+          <div data-group="Write sound"></div>
+          <p class="hint">A real drive sounds the same for both. Separate mode is an audible indicator; one-shot export then gives a read set and a write set.</p>
         </details>
         <details>
           <summary>Spindle</summary>

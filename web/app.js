@@ -2,7 +2,7 @@
 
 import { exportAll, exportClicks, exportSequence } from '/dsp/export.js';
 import {
-  DEFAULT_PRESET, PRESET_NAMES, RESONATOR_LIMITS, SCENARIO_NAMES, SCHEMA,
+  DEFAULT_PRESET, FILTER_LIMITS, PRESET_NAMES, RESONATOR_LIMITS, SCENARIO_NAMES, SCHEMA,
   defaultParams, getPath, presetParams, sanitizeParams, scenarioParams, setPath,
 } from '/dsp/params.js';
 import { makeZip } from '/dsp/zip.js';
@@ -167,6 +167,88 @@ function buildResonators() {
   $('add-resonator').disabled = list.length >= RESONATOR_LIMITS.count[1];
 }
 
+// ---------- filters ----------
+
+const FILTER_ROWS = {
+  combined: [['all', 'All parts']],
+  separate: [['head', 'Head clicks'], ['motor', 'Motor tones'], ['air', 'Airflow noise'], ['whine', 'Bearing whine']],
+};
+const CUTOFF_STEPS = 1000; // slider positions, spread evenly over the octaves
+
+function buildFilters(type) {
+  const body = document.querySelector(`#${type}-filters tbody`);
+  body.textContent = '';
+  const [lo, hi] = FILTER_LIMITS.hz;
+  const toHz = (pos) => Math.round(lo * Math.pow(hi / lo, pos / CUTOFF_STEPS));
+  const toPos = (hz) => Math.round((CUTOFF_STEPS * Math.log(hz / lo)) / Math.log(hi / lo));
+  const kind = type === 'hp' ? 'high-pass' : 'low-pass';
+  for (const [target, title] of FILTER_ROWS[params.filters[`${type}Mode`]]) {
+    const f = params.filters[type][target];
+    const tr = document.createElement('tr');
+    const cell = (...nodes) => {
+      const td = document.createElement('td');
+      td.append(...nodes);
+      tr.append(td);
+    };
+    const on = document.createElement('input');
+    on.type = 'checkbox';
+    on.checked = f.on;
+    const name = document.createElement('label');
+    name.className = 'check';
+    name.append(on, ` ${title}`);
+    on.addEventListener('change', () => { f.on = on.checked; pushParams(); });
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = 0;
+    slider.max = CUTOFF_STEPS;
+    slider.value = toPos(f.hz);
+    slider.setAttribute('aria-label', `${title} ${kind} cutoff`);
+    const hz = document.createElement('input');
+    hz.type = 'number';
+    [hz.min, hz.max] = FILTER_LIMITS.hz;
+    hz.value = f.hz;
+    hz.title = 'Cutoff in Hz';
+    hz.setAttribute('aria-label', `${title} ${kind} cutoff in Hz`);
+    const setHz = (v) => {
+      f.hz = Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : f.hz;
+      hz.value = f.hz;
+      slider.value = toPos(f.hz);
+      pushParams();
+    };
+    slider.addEventListener('input', () => setHz(toHz(Number(slider.value))));
+    hz.addEventListener('change', () => setHz(Number(hz.value)));
+
+    const res = document.createElement('input');
+    res.type = 'number';
+    [res.min, res.max] = FILTER_LIMITS.resDb;
+    res.step = 0.5;
+    res.value = f.resDb;
+    res.title = 'Resonance in dB';
+    res.setAttribute('aria-label', `${title} ${kind} resonance in dB`);
+    res.addEventListener('change', () => {
+      const v = Number(res.value);
+      const [rLo, rHi] = FILTER_LIMITS.resDb;
+      f.resDb = Number.isFinite(v) ? Math.min(rHi, Math.max(rLo, v)) : f.resDb;
+      res.value = f.resDb;
+      pushParams();
+    });
+
+    const slope = document.createElement('select');
+    slope.setAttribute('aria-label', `${title} ${kind} slope`);
+    for (const s of FILTER_LIMITS.slopes) slope.append(new Option(`${s} dB/oct`, s));
+    slope.value = f.slope;
+    slope.addEventListener('change', () => { f.slope = Number(slope.value); pushParams(); });
+
+    cell(name);
+    cell(slider);
+    cell(hz, ' Hz');
+    cell(res, ' dB');
+    cell(slope);
+    body.append(tr);
+  }
+}
+
 function harmonicsText() {
   return params.spindle.harmonics.map((h) => `${h.n}:${h.db}`).join(', ');
 }
@@ -192,6 +274,14 @@ function refreshAll() {
   $('lamp').dataset.color = params.light.color;
   $('seed').value = params.seed;
   $('harmonics').value = harmonicsText();
+  $('rw-mode').value = params.rw.mode;
+  $('seek-write').hidden = params.rw.mode !== 'separate';
+  $('seek').textContent = params.rw.mode === 'separate' ? 'Seek (read)' : 'Seek';
+  $('baseline-mode').value = params.live.baselineMode;
+  $('hp-mode').value = params.filters.hpMode;
+  $('lp-mode').value = params.filters.lpMode;
+  buildFilters('hp');
+  buildFilters('lp');
   buildResonators();
 }
 
@@ -228,6 +318,13 @@ function showState(state) {
   $('lamp').style.setProperty('--b', state.light.toFixed(3));
   const queue = state.queue > 0 ? ` Queue: ${state.queue}.` : '';
   $('drive-state').textContent = `${STATE_TEXT[state.spindle] || ''}${queue}`;
+  // R8.10
+  let text = 'Baseline off: all activity is normal.';
+  if (params.live.baselineMode !== 'off') {
+    const rated = state.rate > 0 ? (state.background ? 'background' : 'normal') : 'none';
+    text = `Baseline: ${state.baseline.toFixed(1)} operations/s. Last second: ${state.rate} operations, rated ${rated}.`;
+  }
+  if ($('baseline-status').textContent !== text) $('baseline-status').textContent = text;
 }
 
 async function spin(up) {
@@ -270,14 +367,17 @@ function onLive(event) {
   }
   const pick = $('device').value;
   let ops = 0;
+  let writeOps = 0;
   let bytes = 0;
   for (const name of names) {
     if (pick !== '*' && pick !== name) continue;
     const [reads, writes, bytesRead, bytesWritten] = m.devices[name];
     ops += reads + writes;
+    writeOps += writes;
     bytes += bytesRead + bytesWritten;
   }
-  if (ops > 0) post({ type: 'feed', ops, bytes, interval: m.dt });
+  // Samples without activity are sent too: the idle baseline is built from them.
+  post({ type: 'feed', ops, writes: writeOps, bytes, interval: m.dt });
   const rate = `${Math.round(ops / m.dt)} operations/s, ${(bytes / m.dt / 1e6).toFixed(1)} MB/s`;
   setLiveStatus(audio ? rate : `${rate}. Press Spin up to hear and see it.`);
 }
@@ -372,14 +472,33 @@ function init() {
   $('seek-dist').addEventListener('input', () => {
     $('seek-dist-out').textContent = Number($('seek-dist').value).toFixed(2);
   });
-  $('seek').addEventListener('click', async () => {
-    try {
-      await startAudio();
-      post({ type: 'seek', dist: Number($('seek-dist').value) });
-    } catch (err) {
-      $('drive-state').textContent = `Sound could not be started: ${err.message}`;
-    }
+  for (const [id, write] of [['seek', false], ['seek-write', true]]) {
+    $(id).addEventListener('click', async () => {
+      try {
+        await startAudio();
+        post({ type: 'seek', dist: Number($('seek-dist').value), write });
+      } catch (err) {
+        $('drive-state').textContent = `Sound could not be started: ${err.message}`;
+      }
+    });
+  }
+  $('rw-mode').addEventListener('change', () => {
+    params.rw.mode = $('rw-mode').value;
+    refreshAll();
+    pushParams();
   });
+  $('baseline-mode').addEventListener('change', () => {
+    params.live.baselineMode = $('baseline-mode').value;
+    pushParams();
+  });
+  $('device').addEventListener('change', () => post({ type: 'baseline-reset' }));
+  for (const type of ['hp', 'lp']) {
+    $(`${type}-mode`).addEventListener('change', () => {
+      params.filters[`${type}Mode`] = $(`${type}-mode`).value;
+      buildFilters(type);
+      pushParams();
+    });
+  }
 
   $('preset').addEventListener('change', () => {
     Object.assign(params, presetParams($('preset').value), { preset: $('preset').value });

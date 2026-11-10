@@ -2,9 +2,11 @@
 // Runs unchanged in the browser audio worklet and in Node (spec R4.2).
 
 import { ActivityGenerator } from './activity.js';
+import { Baseline } from './baseline.js';
 import { ClickSynth } from './click.js';
 import { DriveModel } from './drive-model.js';
-import { dbToGain } from './params.js';
+import { FilterBank } from './filters.js';
+import { SILENCE_DB, dbToGain } from './params.js';
 import { makeRng } from './prng.js';
 import { Spindle } from './spindle.js';
 
@@ -35,6 +37,8 @@ export class Engine {
     this.activity = new ActivityGenerator(params.sim, this.rngActivity);
     this.clicks = new ClickSynth(params.click, sampleRate);
     this.spindle = new Spindle(params.spindle, params.drive.rpm, sampleRate, makeRng(seed, 3));
+    this.filters = new FilterBank(sampleRate);
+    this.baseline = new Baseline(params.live);
 
     // Clicks are added into a ring that is read out as the head layer.
     let ringLen = 1024;
@@ -51,7 +55,7 @@ export class Engine {
     this.lightCount = 0;
     this.head = new Float32Array(CHUNK);
     this.sp = new Float32Array(CHUNK);
-    this.onSeek = (offsetS, dist, seekS) => this.scheduleSeek(offsetS, dist, seekS);
+    this.onSeek = (offsetS, dist, seekS, op) => this.scheduleSeek(offsetS, dist, seekS, op.write, op.bg);
     this.setParams(params);
   }
 
@@ -61,6 +65,8 @@ export class Engine {
     this.activity.setParams(params.sim);
     this.clicks.setParams(params.click);
     this.spindle.setParams(params.spindle, params.drive.rpm);
+    this.filters.setParams(params.filters);
+    this.baseline.setParams(params.live);
     this.headGain = dbToGain(params.mix.headDb);
     this.spindleGain = dbToGain(params.mix.spindleDb);
     this.masterGain = dbToGain(params.mix.masterDb);
@@ -89,18 +95,26 @@ export class Engine {
   }
 
   /** One seek on demand, for auditioning (R9.3). */
-  triggerSeek(dist) {
+  triggerSeek(dist, write = false) {
     const d = Math.min(1, Math.max(0.001, dist));
-    this.scheduleSeek(0, d, this.model.seekTimeS(d));
+    this.scheduleSeek(0, d, this.model.seekTimeS(d), write);
   }
 
   /**
    * Real activity for the coming interval (live mode, R8.4): `ops` operations
-   * totalling `bytes`, spread evenly over `intervalS` seconds.
+   * totalling `bytes`, spread evenly over `intervalS` seconds. `writes` of
+   * them are write operations (R6.21). Every statistics sample must be fed,
+   * also those without operations: the idle baseline is built from them (R8.6).
    */
-  feed(ops, bytes, intervalS) {
-    if (!(ops > 0) || !(intervalS > 0)) return;
-    this.feeds.push({ left: ops, size: Math.max(0, bytes) / ops, rate: ops / intervalS, acc: 0 });
+  feed(ops, bytes, intervalS, writes = 0) {
+    if (!(intervalS > 0)) return;
+    const count = ops > 0 ? ops : 0;
+    const bg = this.baseline.sample(count, intervalS);
+    if (count === 0) return;
+    this.feeds.push({
+      left: count, size: Math.max(0, bytes) / count, rate: count / intervalS, acc: 0,
+      writeShare: Math.min(1, Math.max(0, writes / count)), writeAcc: 0, bg,
+    });
   }
 
   /** Mean light brightness (0..1) since the previous call. */
@@ -117,8 +131,8 @@ export class Engine {
     return Math.max(0.005, Math.abs(this.rngModel() - this.rngModel()));
   }
 
-  scheduleClick(offsetSamples, dist, extraDb) {
-    const buf = this.clicks.render(dist, this.rngClick, extraDb);
+  scheduleClick(offsetSamples, dist, extraDb, pitch = 1) {
+    const buf = this.clicks.render(dist, this.rngClick, extraDb, false, pitch);
     const room = this.ring.length - CHUNK - buf.length;
     const start = this.ringPos + Math.max(0, Math.min(Math.round(offsetSamples), room));
     const ring = this.ring;
@@ -127,10 +141,23 @@ export class Engine {
   }
 
   // R6.4: one click for a short seek; start and end clicks for a long one.
-  scheduleSeek(offsetS, dist, seekS) {
+  // R6.20: in separate mode a write differs in pitch and level.
+  // R8.9: background activity clicks at the background click level.
+  scheduleSeek(offsetS, dist, seekS, write = false, bg = false) {
+    const p = this.p;
+    let db = 0;
+    let pitch = 1;
+    if (write && p.rw.mode === 'separate') {
+      db += p.rw.writeLevelDb;
+      pitch = 1 + p.rw.writePitchPct / 100;
+    }
+    if (bg) {
+      if (p.live.bgClickDb <= SILENCE_DB) return;
+      db += p.live.bgClickDb;
+    }
     const at = offsetS * this.sr;
-    this.scheduleClick(at, dist, 0);
-    if (dist > this.p.click.pairThreshold) this.scheduleClick(at + seekS * this.sr, dist, -2);
+    this.scheduleClick(at, dist, db, pitch);
+    if (dist > p.click.pairThreshold) this.scheduleClick(at + seekS * this.sr, dist, db - 2, pitch);
   }
 
   // R6.10: the head leaves its parking position once the drive is at speed.
@@ -171,7 +198,7 @@ export class Engine {
     const model = this.model;
 
     if (this.simEnabled) {
-      this.activity.advance(dt, (bytes) => model.addOp(bytes, this.drawDist()));
+      this.activity.advance(dt, (bytes, isWrite) => model.addOp(bytes, this.drawDist(), isWrite));
     }
     for (let i = 0; i < this.feeds.length; i++) {
       const f = this.feeds[i];
@@ -179,7 +206,12 @@ export class Engine {
       let count = Math.min(f.left, Math.floor(f.acc));
       f.acc -= count;
       f.left -= count;
-      while (count-- > 0) model.addOp(f.size, this.drawDist());
+      while (count-- > 0) {
+        f.writeAcc += f.writeShare;
+        const isWrite = f.writeAcc >= 1 - 1e-9;
+        if (isWrite) f.writeAcc -= 1;
+        model.addOp(f.size, this.drawDist(), isWrite, f.bg);
+      }
     }
     if (this.feeds.length > 0 && this.feeds[0].left <= 0) {
       this.feeds = this.feeds.filter((f) => f.left > 0);
@@ -189,7 +221,15 @@ export class Engine {
 
     const lp = this.p.light;
     let light = this.light;
-    if (busyS > 0) light = 1 - (1 - light) * Math.exp(-busyS / (lp.onMs / 1000));
+    const bgS = model.bgBusy;
+    const normalS = busyS - bgS;
+    if (normalS > 0) light = 1 - (1 - light) * Math.exp(-normalS / (lp.onMs / 1000));
+    if (bgS > 0) {
+      // R8.9: background activity lifts the light to the background brightness only.
+      const target = this.p.live.bgLightPct / 100;
+      if (light < target) light = target - (target - light) * Math.exp(-bgS / (lp.onMs / 1000));
+      else light = Math.max(target, light * Math.exp(-bgS / (lp.offMs / 1000)));
+    }
     if (dt - busyS > 0) light *= Math.exp(-(dt - busyS) / (lp.offMs / 1000));
     this.light = light;
     this.lightSum += light * c;
@@ -206,8 +246,24 @@ export class Engine {
     }
     this.ringPos = rp;
 
+    // R6.18: filters come before the mixer gains and the limiter.
+    const filters = this.filters;
+    filters.head(head, c);
     const sp = this.sp;
-    this.spindle.process(sp, c);
+    const spindle = this.spindle;
+    if (filters.spindleActive) {
+      spindle.processParts(c);
+      const { motor, air, whine } = spindle.parts;
+      if (filters.spindleSplit) {
+        filters.part('motor', motor, c);
+        filters.part('air', air, c);
+        filters.part('whine', whine, c);
+      }
+      for (let i = 0; i < c; i++) sp[i] = motor[i] + (air[i] + whine[i]);
+      filters.layer('spindle', sp, c);
+    } else {
+      spindle.process(sp, c);
+    }
     if (this.spindle.justReady) {
       model.ready = true;
       if (this.p.spindle.unlockClicks) this.scheduleUnlock();

@@ -1,8 +1,9 @@
 // Export (spec section 10). The page and the command line both call these
 // functions, so identical parameters give identical files (R10.5).
 
-import { ClickSynth } from './click.js';
+import { CLICK_MAX_S, ClickSynth } from './click.js';
 import { Engine, softLimit } from './engine.js';
+import { FilterBank } from './filters.js';
 import { dbToGain, sanitizeParams, scenarioParams } from './params.js';
 import { makeRng } from './prng.js';
 import { renderSpindleLoop } from './spindle.js';
@@ -13,6 +14,7 @@ export const ONE_SHOT_PEAK = Math.pow(10, -1 / 20); // -1 dBFS
 const ONSET_RATIO = 0.01; // the onset is the first sample within 40 dB of the peak
 const PRE_ROLL_S = 0.0002;
 const TAIL_ZEROS = 16;
+const CLICK_FADE_S = 0.004;
 
 export const SEQUENCE_NAMES = ['burst', 'spinup', 'spindown', 'spindle_loop', 'idle'];
 
@@ -25,24 +27,53 @@ export function renderClickSet(input) {
   const p = sanitizeParams(input);
   const sr = p.export.sampleRate;
   const synth = new ClickSynth(p.click, sr);
-  const rng = makeRng(p.seed, 10);
   const count = p.export.clickCount;
   const maxLen = Math.floor(ONE_SHOT_MAX_S * sr);
   const files = [];
-  for (let i = 0; i < count; i++) {
-    const frac = count === 1 ? 1 : i / (count - 1);
-    const dist = p.export.distMin + (p.export.distMax - p.export.distMin) * frac;
-    const raw = synth.render(dist, rng, 0, true);
-    let onset = 0;
-    while (onset < raw.length && Math.abs(raw[onset]) < ONSET_RATIO) onset++;
-    const start = Math.max(0, onset - Math.round(PRE_ROLL_S * sr));
-    const len = Math.min(maxLen, raw.length - start + TAIL_ZEROS);
-    const samples = new Float32Array(len);
-    const copy = Math.min(len - TAIL_ZEROS, raw.length - start);
-    for (let k = 0; k < copy; k++) samples[k] = raw[start + k] * ONE_SHOT_PEAK;
-    files.push({ name: `click_${String(i + 1).padStart(2, '0')}.wav`, samples });
+  const addSet = (prefix, rng, pitch) => {
+    for (let i = 0; i < count; i++) {
+      const frac = count === 1 ? 1 : i / (count - 1);
+      const dist = p.export.distMin + (p.export.distMax - p.export.distMin) * frac;
+      const raw = filterClick(synth.render(dist, rng, 0, true, pitch), p.filters, sr);
+      let onset = 0;
+      while (onset < raw.length && Math.abs(raw[onset]) < ONSET_RATIO) onset++;
+      const start = Math.max(0, onset - Math.round(PRE_ROLL_S * sr));
+      const len = Math.min(maxLen, raw.length - start + TAIL_ZEROS);
+      const samples = new Float32Array(len);
+      const copy = Math.min(len - TAIL_ZEROS, raw.length - start);
+      for (let k = 0; k < copy; k++) samples[k] = raw[start + k] * ONE_SHOT_PEAK;
+      files.push({ name: `${prefix}_${String(i + 1).padStart(2, '0')}.wav`, samples });
+    }
+  };
+  if (p.rw.mode === 'separate') {
+    // R10.6. The level offset has no effect here: one-shots are peak-normalised.
+    addSet('click_read', makeRng(p.seed, 10), 1);
+    addSet('click_write', makeRng(p.seed, 12), 1 + p.rw.writePitchPct / 100);
+  } else {
+    addSet('click', makeRng(p.seed, 10), 1);
   }
   return files;
+}
+
+// R6.19: the head filters applied to a normalised click. The result is again
+// a click with peak 1 that ends in silence within the click length limit.
+function filterClick(click, filters, sr) {
+  const bank = new FilterBank(sr);
+  bank.setParams(filters);
+  if (!bank.headActive) return click;
+  const n = Math.floor(CLICK_MAX_S * sr); // room for the filters to ring out
+  const buf = new Float32Array(n);
+  buf.set(click);
+  bank.head(buf, n);
+  const fade = Math.round(CLICK_FADE_S * sr);
+  let peak = 0;
+  for (let i = 0; i < n; i++) {
+    const left = n - 1 - i;
+    if (left < fade) buf[i] *= 0.5 - 0.5 * Math.cos((Math.PI * left) / fade);
+    peak = Math.max(peak, Math.abs(buf[i]));
+  }
+  if (peak > 0) for (let i = 0; i < n; i++) buf[i] /= peak;
+  return buf;
 }
 
 /**
@@ -83,7 +114,9 @@ export function renderSequence(kind, input) {
       return out;
     }
     case 'spindle_loop': {
-      const loop = renderSpindleLoop(p.spindle, p.drive.rpm, sr, p.export.loopSeconds, makeRng(p.seed, 11));
+      const bank = new FilterBank(sr);
+      bank.setParams(p.filters);
+      const loop = renderSpindleLoop(p.spindle, p.drive.rpm, sr, p.export.loopSeconds, makeRng(p.seed, 11), bank);
       const gain = dbToGain(p.mix.masterDb) * dbToGain(p.mix.spindleDb);
       for (let i = 0; i < loop.length; i++) loop[i] = softLimit(gain * loop[i]);
       return loop;

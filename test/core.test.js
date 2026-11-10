@@ -336,7 +336,7 @@ test('R6.9, R6.10: spin-up takes the configured time, then the head unlocks; spi
 
 test('R7.1, R7.2: the light follows the busy signal, rises fast and falls slower', () => {
   const sr = 48000;
-  const engine = new Engine(sanitizeParams({ drive: { idleRecal: false } }), sr);
+  const engine = new Engine(sanitizeParams({ drive: { idleRecal: false }, live: { baselineMode: 'off' } }), sr);
   engine.spinUp(true);
   const out = new Float32Array(128);
   engine.process(out);

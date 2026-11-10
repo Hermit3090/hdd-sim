@@ -6,6 +6,7 @@ import { PART_SILENCE_DB, dbToGain } from './params.js';
 
 const UNIFORM_VARIANCE = 1 / 3; // of white noise in [-1, 1)
 const WHINE_Q = 60;
+const FILTER_SETTLE_S = 3; // a 20 Hz filter at full resonance rings for about a second
 
 class BandNoise {
   constructor() {
@@ -56,6 +57,7 @@ export class Spindle {
     this.air = new BandNoise();
     this.whine = new BandNoise();
     this.justReady = false;
+    this.parts = { motor: new Float64Array(0), air: new Float64Array(0), whine: new Float64Array(0) };
     this.setParams(p, rpm);
   }
 
@@ -93,6 +95,19 @@ export class Spindle {
 
   /** Writes n samples to out. Sets justReady when spin-up completes in this call. */
   process(out, n) {
+    this.processParts(n);
+    const { motor, air, whine } = this.parts;
+    for (let i = 0; i < n; i++) out[i] = motor[i] + (air[i] + whine[i]);
+  }
+
+  /** Like process, but leaves the three sound parts apart in this.parts. */
+  processParts(n) {
+    if (this.parts.motor.length < n) {
+      for (const key of Object.keys(this.parts)) this.parts[key] = new Float64Array(n);
+    }
+    const partMotor = this.parts.motor;
+    const partAir = this.parts.air;
+    const partWhine = this.parts.whine;
     this.justReady = false;
     const sr = this.sr;
     const dt = n / sr;
@@ -116,7 +131,9 @@ export class Spindle {
     }
     const speed = this.speed;
     if (this.state === 'stopped') {
-      out.fill(0, 0, n);
+      partMotor.fill(0, 0, n);
+      partAir.fill(0, 0, n);
+      partWhine.fill(0, 0, n);
       return;
     }
 
@@ -135,12 +152,12 @@ export class Spindle {
       phase += step;
       let s = 0;
       for (let h = 0; h < harm.length; h++) s += harm[h].g * Math.sin(harm[h].n * phase);
-      s *= motor;
+      partMotor[i] = s * motor;
       // Both noise values are always drawn so the stream stays in step.
       const air = this.air.step(noise() * 2 - 1);
       const whine = this.whine.step(noise() * 2 - 1);
-      s += airGain * (1 + wobble * Math.sin(phase)) * air + whineGain * whine;
-      out[i] = s;
+      partAir[i] = airGain * (1 + wobble * Math.sin(phase)) * air;
+      partWhine[i] = whineGain * whine;
     }
     if (phase > 1e6) phase %= 2 * Math.PI;
     this.phase = phase;
@@ -152,8 +169,9 @@ export class Spindle {
  * frequency is moved to the nearest value with a whole number of turns in the
  * loop, and the noise is made periodic by running one fixed noise sequence
  * through the filters twice and keeping the second pass.
+ * @param {import('./filters.js').FilterBank} [bank] filters to apply (R6.19)
  */
-export function renderSpindleLoop(p, rpm, sampleRate, seconds, rng) {
+export function renderSpindleLoop(p, rpm, sampleRate, seconds, rng, bank = null) {
   const n = Math.max(1, Math.round(seconds * sampleRate));
   const loopS = n / sampleRate;
   const f0 = Math.max(1, Math.round((rpm / 60) * loopS)) / loopS;
@@ -168,8 +186,32 @@ export function renderSpindleLoop(p, rpm, sampleRate, seconds, rng) {
   const spindle = new Spindle(p, f0 * 60, sampleRate, cyclic);
   spindle.start(true);
   const out = new Float32Array(n);
-  spindle.process(out, n);
-  spindle.phase = 0; // n samples are a whole number of turns; drop rounding drift
-  spindle.process(out, n);
+  if (!bank || !bank.spindleActive) {
+    spindle.process(out, n);
+    spindle.phase = 0; // n samples are a whole number of turns; drop rounding drift
+    spindle.process(out, n);
+    return out;
+  }
+  // With filters: the same two passes, then the periodic second pass is fed
+  // through the filters until they have settled, and the last round is kept.
+  const names = ['motor', 'air', 'whine'];
+  const mix = new Float64Array(n);
+  const work = new Float64Array(n);
+  const filterPass = () => {
+    mix.fill(0);
+    for (const name of names) {
+      work.set(spindle.parts[name].subarray(0, n));
+      bank.part(name, work, n);
+      for (let i = 0; i < n; i++) mix[i] += work[i];
+    }
+    bank.layer('spindle', mix, n);
+  };
+  spindle.processParts(n);
+  filterPass();
+  spindle.phase = 0;
+  spindle.processParts(n);
+  const rounds = 1 + Math.ceil(FILTER_SETTLE_S / loopS);
+  for (let r = 0; r < rounds; r++) filterPass();
+  out.set(mix);
   return out;
 }

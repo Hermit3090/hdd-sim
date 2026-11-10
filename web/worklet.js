@@ -19,8 +19,9 @@ class HddSimProcessor extends AudioWorkletProcessor {
     switch (msg.type) {
       case 'params': engine.setParams(sanitizeParams(msg.params)); break;
       case 'mode': engine.setSimEnabled(msg.mode === 'sim'); break;
-      case 'feed': engine.feed(msg.ops, msg.bytes, msg.interval); break;
-      case 'seek': engine.triggerSeek(msg.dist); break;
+      case 'feed': engine.feed(msg.ops, msg.bytes, msg.interval, msg.writes); break;
+      case 'baseline-reset': engine.baseline.reset(); break;
+      case 'seek': engine.triggerSeek(msg.dist, !!msg.write); break;
       case 'spin': if (msg.up) engine.spinUp(); else engine.spinDown(); break;
       case 'mute': this.muted = !!msg.muted; break;
     }
@@ -42,6 +43,9 @@ class HddSimProcessor extends AudioWorkletProcessor {
         queue: e.model.queue.length,
         spindle: e.spindle.state,
         speed: e.spindle.speed,
+        baseline: e.baseline.baseline,
+        rate: e.baseline.rate,
+        background: e.baseline.background,
       });
     }
     return true;
