@@ -68,6 +68,10 @@ const PRESETS = {
   },
 };
 
+// The owner's tuning of desktop-90s: the same drive with a quieter bearing whine.
+PRESETS['desktop-90s-2'] = JSON.parse(JSON.stringify(PRESETS['desktop-90s']));
+Object.assign(PRESETS['desktop-90s-2'].spindle, { whineHz: 4320, whineDb: -56 });
+
 const SCENARIOS = {
   'idle': { opsPerSec: 0, burstiness: 0, burstLen: 5, seekSpread: 0.7, readMix: 0.8, opSizeKB: 32 },
   'light desktop use': { opsPerSec: 4, burstiness: 0.85, burstLen: 5, seekSpread: 0.7, readMix: 0.7, opSizeKB: 32 },
@@ -78,7 +82,7 @@ const SCENARIOS = {
 
 export const PRESET_NAMES = Object.keys(PRESETS);
 export const SCENARIO_NAMES = Object.keys(SCENARIOS);
-export const DEFAULT_PRESET = 'laptop-2000s';
+export const DEFAULT_PRESET = 'desktop-90s-2';
 export const DEFAULT_SCENARIO = 'light desktop use';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -108,7 +112,7 @@ export function defaultParams(preset = DEFAULT_PRESET) {
     seed: 1,
     preset: name,
     ...presetParams(name),
-    mix: { headDb: 0, spindleDb: 0, masterDb: 0 },
+    mix: { headDb: -11.5, spindleDb: 0, masterDb: 0 },
     light: { onMs: 2, offMs: 30, color: 'green' },
     rw: { mode: 'combined', writePitchPct: -6, writeLevelDb: 0 },
     filters: {
@@ -117,8 +121,8 @@ export function defaultParams(preset = DEFAULT_PRESET) {
       hp: filterSet(120),
       lp: filterSet(8000),
     },
-    live: { baselineMode: 'adaptive', baselineOps: 10, rampUpS: 1.5, cooldownS: 10, bgLightPct: 15, bgClickDb: -18 },
-    pattern: { on: false, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 },
+    live: { baselineMode: 'adaptive', baselineOps: 16, rampUpS: 0.4, cooldownS: 8, bgLightPct: 28, bgClickDb: -15.5 },
+    pattern: { on: true, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 },
     scenario: DEFAULT_SCENARIO,
     sim: scenarioParams(DEFAULT_SCENARIO),
     export: {

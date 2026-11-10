@@ -36,10 +36,11 @@ function pushParams() {
   pushQueued = true;
   requestAnimationFrame(() => {
     pushQueued = false;
-    params = sanitizeParams(params);
-    post({ type: 'params', params });
+    // `params` itself is left in place: the controls hold on to its parts.
+    const clean = sanitizeParams(params);
+    post({ type: 'params', params: clean });
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(params));
+      localStorage.setItem(STORE_KEY, JSON.stringify(clean));
     } catch {
       /* storage may be unavailable; the page works without it */
     }
@@ -536,7 +537,7 @@ function init() {
     const list = parseHarmonics($('harmonics').value);
     if (list) params.spindle.harmonics = list;
     params = sanitizeParams(params);
-    $('harmonics').value = harmonicsText();
+    refreshAll(); // the tables must point at the new object
     pushParams();
   });
   $('add-resonator').addEventListener('click', () => {

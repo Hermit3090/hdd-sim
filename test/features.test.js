@@ -16,7 +16,8 @@ const SR = 48000;
 const PARTS = ['head', 'motor', 'air', 'whine'];
 
 function thrash(edit) {
-  const p = defaultParams();
+  const p = defaultParams('laptop-2000s');
+  p.pattern.on = false; // tested on its own below
   p.sim = scenarioParams('thrash');
   if (edit) edit(p);
   const engine = new Engine(sanitizeParams(p), SR);
@@ -155,7 +156,7 @@ test('R6.16: high-pass and low-pass modes are chosen independently', () => {
 
 test('R6.16: a high-pass on the motor tones removes the deep rotation tone and keeps the rest', () => {
   const quiet = (edit) => {
-    const p = defaultParams();
+    const p = defaultParams('laptop-2000s'); // 4200 rpm: a 70 Hz rotation tone
     p.drive.idleRecal = false;
     if (edit) edit(p);
     const engine = new Engine(sanitizeParams(p), SR);
@@ -390,7 +391,7 @@ test('R8.6: a sample is rated by the operations of the last second, the sample i
 
 test('R8.7: baseline modes off, manual and adaptive; adaptive is the default', () => {
   const d = defaultParams().live;
-  assert.deepEqual(d, { baselineMode: 'adaptive', baselineOps: 10, rampUpS: 1.5, cooldownS: 10, bgLightPct: 15, bgClickDb: -18 });
+  assert.deepEqual(d, { baselineMode: 'adaptive', baselineOps: 16, rampUpS: 0.4, cooldownS: 8, bgLightPct: 28, bgClickDb: -15.5 });
   const off = new Baseline(liveParams({ baselineMode: 'off' }));
   for (let i = 0; i < 40; i++) assert.equal(off.sample(1, DT), false);
   const manual = new Baseline(liveParams({ baselineMode: 'manual', baselineOps: 0 }));
@@ -417,7 +418,7 @@ test('R8.8: the activity level rises with activity over the ramp-up time and fal
 
 test('R8.8: one short burst stays quiet, bursts close together add up, far apart they do not', () => {
   const run = (gapS) => {
-    const b = new Baseline(liveParams({ baselineMode: 'adaptive' }));
+    const b = new Baseline(liveParams({ baselineMode: 'adaptive', rampUpS: 1.5, cooldownS: 10 }));
     const peaks = [];
     for (let burst = 0; burst < 6; burst++) {
       b.sample(20, DT);
@@ -443,14 +444,15 @@ test('A2: with a manual baseline, a load of five times the baseline is rated nor
 });
 
 test('A2: in adaptive mode a steady load is at the normal level within the ramp-up time plus 100 ms', () => {
-  const live = defaultParams().live;
-  const b = new Baseline(live);
-  b.sample(5, DT);
-  b.sample(5, DT);
-  assert.ok(b.level < 0.1, `a 100 ms burst from rest gives ${b.level}`);
-  let t = 2 * DT;
-  while (b.level < 1) { b.sample(5, DT); t += DT; }
-  assert.ok(t <= live.rampUpS + 0.1 + 1e-9, `full level after ${t} s`);
+  for (const rampUpS of [0.4, 1.5, 5]) {
+    const b = new Baseline(liveParams({ baselineMode: 'adaptive', rampUpS }));
+    b.sample(5, DT);
+    b.sample(5, DT);
+    assert.ok(b.level <= 0.1 / rampUpS + 1e-9, `a 100 ms burst from rest gives ${b.level}`);
+    let t = 2 * DT;
+    while (b.level < 1) { b.sample(5, DT); t += DT; }
+    assert.ok(t <= rampUpS + 0.1 + 1e-9, `full level after ${t} s`);
+  }
 });
 
 function liveEngine(live) {
@@ -545,11 +547,12 @@ function watchOps(engine) {
   return ops;
 }
 
-test('R9.5: the read/write pattern is off by default and then changes nothing', () => {
-  assert.deepEqual(defaultParams().pattern, { on: false, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 });
+test('R9.5: the read/write pattern is on by default; switched off, its settings change nothing', () => {
+  assert.deepEqual(defaultParams().pattern, { on: true, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 });
   const plain = render(thrash(), 2);
   const offButSet = render(thrash((p) => { Object.assign(p.pattern, { readSpread: 0, writeSpread: 0, writeReach: 0.01, flushS: 0.5 }); }), 2);
   assert.deepEqual(offButSet, plain);
+  assert.notDeepEqual(render(thrash((p) => { p.pattern.on = true; }), 2), plain);
   // Independent of the head sound mode: either can be on without the other.
   const p = sanitizeParams({ pattern: { on: true }, rw: { mode: 'combined' } });
   assert.equal(p.pattern.on, true);

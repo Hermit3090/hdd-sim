@@ -57,6 +57,8 @@ export class Engine {
     this.lightCount = 0;
     this.head = new Float32Array(CHUNK);
     this.sp = new Float32Array(CHUNK);
+    this.mix = new Float32Array(CHUNK);
+    this.avail = 0; // samples of the current chunk not handed out yet
     this.onSeek = (offsetS, dist, seekS, op) => this.scheduleSeek(offsetS, dist, seekS, op.write, op.bg);
     this.setParams(params);
   }
@@ -188,13 +190,17 @@ export class Engine {
 
   /**
    * Renders the mix into out[offset .. offset + n).
-   * The result does not depend on how calls are split.
+   * The engine always works in whole chunks and hands out samples from the
+   * current one, so the result does not depend on how calls are split.
    */
   process(out, offset = 0, n = out.length - offset) {
     let done = 0;
     while (done < n) {
-      const c = Math.min(n - done, CHUNK - (this.pos % CHUNK));
-      this.chunk(out, offset + done, c);
+      if (this.avail === 0) this.chunk();
+      const c = Math.min(n - done, this.avail);
+      const from = CHUNK - this.avail;
+      out.set(this.mix.subarray(from, from + c), offset + done);
+      this.avail -= c;
       done += c;
     }
   }
@@ -203,15 +209,19 @@ export class Engine {
   processLayers(head, spindle, n = head.length) {
     let done = 0;
     while (done < n) {
-      const c = Math.min(n - done, CHUNK - (this.pos % CHUNK));
-      this.chunk(null, 0, c);
-      head.set(this.head.subarray(0, c), done);
-      spindle.set(this.sp.subarray(0, c), done);
+      if (this.avail === 0) this.chunk();
+      const c = Math.min(n - done, this.avail);
+      const from = CHUNK - this.avail;
+      head.set(this.head.subarray(from, from + c), done);
+      spindle.set(this.sp.subarray(from, from + c), done);
+      this.avail -= c;
       done += c;
     }
   }
 
-  chunk(out, offset, c) {
+  // Renders the next whole chunk into this.head, this.sp and this.mix.
+  chunk() {
+    const c = CHUNK;
     const dt = c / this.sr;
     const model = this.model;
 
@@ -299,14 +309,12 @@ export class Engine {
       if (this.p.spindle.unlockClicks) this.scheduleUnlock();
     }
 
-    if (out) {
-      const hg = this.headGain;
-      const sg = this.spindleGain;
-      const mg = this.masterGain;
-      for (let i = 0; i < c; i++) {
-        out[offset + i] = softLimit(mg * (hg * head[i] + sg * sp[i]));
-      }
-    }
+    const hg = this.headGain;
+    const sg = this.spindleGain;
+    const mg = this.masterGain;
+    const mix = this.mix;
+    for (let i = 0; i < c; i++) mix[i] = softLimit(mg * (hg * head[i] + sg * sp[i]));
     this.pos += c;
+    this.avail = c;
   }
 }
