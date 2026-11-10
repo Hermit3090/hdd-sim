@@ -20,6 +20,8 @@ All sound is generated from parameters. No recorded audio is shipped, loaded or 
 - HDD synth: head (seek) sound and spindle sound, spin-up and spin-down.
 - Drive model that turns disk activity into mechanical events.
 - One activity light.
+- Filters per sound part, and an optional separate sound for write operations.
+- An idle baseline in live mode, so that a system's background disk activity stays quiet.
 - Live mode (real disk statistics) and simulation mode (editable parameters).
 - WAV export of one-shot clicks and of sequences.
 
@@ -36,6 +38,9 @@ All sound is generated from parameters. No recorded audio is shipped, loaded or 
 - **Seek**: a head movement. Produces head sound.
 - **Click**: one synthesized head impulse.
 - **Head layer / spindle layer**: the two sound layers, mixed separately.
+- **Sound part**: one of the four sources that can be filtered separately: head clicks, motor
+  tones, airflow noise, bearing whine. The last three together form the spindle layer.
+- **Background activity**: live activity at or below the idle baseline (section 8).
 - **Preset**: a named set of drive parameters. **Scenario**: a named set of simulation
   parameters.
 
@@ -120,6 +125,31 @@ Reference measurements behind the defaults are in section 11.
   whine). A preset sets every drive parameter. More may be added without a spec change, as they
   are parameter values only.
 
+### 6.5 Filters
+
+- R6.15 A filter is a high-pass or a low-pass with four settings: on/off, cutoff frequency
+  (20 Hz–20 kHz), resonance (a boost at the cutoff, 0–24 dB) and slope (12 or 24 dB per octave).
+- R6.16 High-pass mode is "combined" or "separate". Combined: one high-pass filter acts on all
+  four sound parts. Separate: each sound part has its own high-pass filter. Low-pass mode is
+  chosen the same way, independently of the high-pass mode. Default for both: combined.
+- R6.17 Every filter is off by default. With a filter off, the output is exactly what it is
+  without that filter.
+- R6.18 Filters act before the mixer gains and the limiter. R6.12 still holds.
+- R6.19 Filters apply to live sound and to every export. One-shot clicks still meet R10.2 and
+  the spindle loop still repeats without a seam.
+
+### 6.6 Read and write sound
+
+A real drive's head sounds the same for reads and writes. The difference here is a deliberate
+audible indicator.
+
+- R6.20 Head sound mode is "combined" or "separate". Combined (the default): reads and writes
+  sound the same. Separate: clicks of write operations differ from read clicks by a pitch offset
+  (default −6 %, range ±20 %) and a level offset (default 0 dB, range ±12 dB).
+- R6.21 In live mode the type of an operation comes from the real read and write counts, in
+  simulation from the read share. An operation merged under R5.5 takes the type of the operation
+  it is merged into. Recalibration seeks and unlock clicks use the read sound.
+
 ## 7. Activity light
 
 - R7.1 One light. It follows the drive model's busy signal (R5.6), not the raw statistics.
@@ -142,6 +172,27 @@ Reference measurements behind the defaults are in section 11.
 - R8.5 If the stream stops, the page shows that live data is unavailable and the drive goes
   idle. Simulation mode keeps working without the server's statistics.
 
+### Idle baseline
+
+Even an idle system reads and writes a little all the time. The baseline keeps that quiet.
+It applies in live mode only.
+
+- R8.6 Each statistics sample is rated by the number of operations in the last second, the
+  sample included. At or below the baseline its operations are background activity; above it
+  they are normal activity.
+- R8.7 Baseline mode is "off" (all activity is normal), "manual" (a slider, 0–500 operations per
+  second, default 10) or "adaptive" (the default).
+- R8.8 In adaptive mode the baseline is 1.5 × the 90th percentile of the operations-per-second
+  values of the last two minutes, and never above the adaptive ceiling (default 50 operations
+  per second, range 1–500). Activity above the ceiling is therefore always normal. Until 20
+  seconds of data are available, the manual value is used.
+- R8.9 Background activity passes through the drive model like normal activity, with two
+  differences: the light rises only to the background brightness (default 15 %, range 0–100 %),
+  and clicks play at the background click level relative to normal clicks (default −18 dB, range
+  silence to 0 dB).
+- R8.10 The page shows the current baseline and whether the current activity is rated
+  background or normal.
+
 ## 9. Simulation mode
 
 - R9.1 Activity comes from a generator with these controls: operations per second (0–500),
@@ -151,7 +202,7 @@ Reference measurements behind the defaults are in section 11.
   apart). Shipped scenarios: "idle", "boot", "file copy" (mostly sequential), "thrash" (random,
   defrag-like), "light desktop use".
 - R9.3 Buttons trigger a single seek at a chosen distance, spin-up and spin-down, for auditioning
-  individual sounds.
+  individual sounds. In separate head sound mode the seek can be a read or a write.
 - R9.4 All drive parameters from sections 5–7 are editable in the page while sound plays, and
   changes are audible within 100 ms.
 
@@ -168,6 +219,10 @@ Reference measurements behind the defaults are in section 11.
 - R10.4 The page offers these exports as downloads using the current parameters and seed.
 - R10.5 A command, `node cli/render.js`, produces the same exports into a directory from a
   parameter JSON file. Page and command produce identical files for identical input.
+
+- R10.6 In separate head sound mode (R6.20) the one-shot set holds N read clicks and N write
+  clicks, named `click_read_NN.wav` and `click_write_NN.wav`. In combined mode the names of
+  R10.2 are unchanged.
 
 ## 11. Reference measurements
 
@@ -220,14 +275,18 @@ This is the reference the owner rates best. The "laptop-2000s" preset is tuned t
 2. A second light mode that follows raw statistics, to show the SSD's real all-or-nothing
    pattern next to the emulated one.
 3. Stereo output (head and spindle placed slightly apart). v1 is mono.
-4. Different click character for reads and writes. v1 treats them the same.
+4. Rating live activity by bytes as well as by operations (R8.6 counts operations only).
 
 ## 14. Acceptance
 
 - A1 Automated tests cover: R4.4 (bit-identical renders), R5.5 and R5.8 (queue bound, seek rate
   cap), R6.5 (click length), R6.12 (layer isolation), R6.13 (no clipping, no NaN), R10.2
   (one-shot format, onset, peak, silent end, length), R10.3 (loop seam), R10.5 (page core and
-  command agree).
-- A2 Live mode reacts to a real disk load within 200 ms and returns to idle when the load ends.
+  command agree), R6.16–R6.19 (filter modes, exact bypass, exports), R6.20–R6.21 (write sound),
+  R8.6–R8.9 (baseline rating, adaptive baseline and ceiling, background light and click level),
+  R10.6 (file names).
+- A2 With the baseline off, live mode reacts to a real disk load within 200 ms and returns to
+  idle when the load ends. With a baseline, a load of at least five times the baseline is rated
+  normal within 250 ms.
 - A3 The owner judges realism by ear against the reference collection. Parameter retuning that
   stays inside the ranges in this spec is not a spec change.
