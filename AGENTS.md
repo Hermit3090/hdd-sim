@@ -6,6 +6,17 @@
 - Never put personal data in this repository: API keys or other secrets, phone numbers, addresses, personal emails
   or other personal information. If the work seems to need any of it, ask the owner first.
 
+## Builder rules
+
+- Spec first: `docs/SPEC.md` is the contract. A behaviour change goes into the spec, with the user's approval, and
+  is committed before the code. Never edit the spec to match code already written.
+- No dependencies: plain JavaScript ES modules, nothing to install.
+- Run `npm test` before every commit of code and before every review kickoff.
+- Commit locally; never push.
+- Review files: never write into or commit a `review/results-*.md` file beyond creating its empty sections, and do
+  not edit `review/CONTRACT.md` while a review round is running. When asked to run the current engagement as the
+  reviewer, `review/CONTRACT.md` applies in place of these rules.
+
 <!-- agent-dashboard:begin (managed by `agentstat rules`; edits inside this block are overwritten) -->
 ## Progress status (agent-dashboard)
 This repo reports live status to `.agent-status/` (gitignored) for the agent dashboard. Report as
