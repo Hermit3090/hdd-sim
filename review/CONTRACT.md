@@ -64,4 +64,13 @@ How the result sounds, and whether it is realistic (SPEC A3), is judged by the u
 
 ## Probing
 
-Allowed only against throwaway copies you create in the system temp dir (for example `git worktree add /tmp/<name> <sha>`), with a server you start there on a free port of 127.0.0.1 and a temporary preset folder. Never point anything at the repo working tree, a server the user is running, or the user's files. Anything found by probing goes into the results file as a finding with a reproduction. Do not add test files; propose missing tests as findings.
+The user authorises this for every review round, including rounds started by the runner (its rule "edits stay in the repo" allows temp folders, and this contract's one-file write policy is about the repo's tracked files, not about your throwaway copies):
+
+- Create throwaway copies of the repo in the system temp dir (for example `git worktree add "$(mktemp -d)/hdd-sim" <sha>`, or `cp -r`), and change, mutate, run and delete them freely.
+- Create test fixtures there: temporary preset folders, parameter files, symbolic links, and anything else a probe needs.
+- Start servers from such a copy on a free port of 127.0.0.1, and stop them when done.
+- If your sandbox refuses the system temp dir, use the folder `.review-tmp/` in the repo root in the same way. It is gitignored. Empty it when you finish.
+
+Remove a temporary worktree with `git worktree remove` when done, so the repo's worktree list stays clean.
+
+Never point a probe at the repo working tree itself, a server the user is running, or the user's files, and never mutate the working tree: mutants live in the copies only. Anything found by probing goes into the results file as a finding with a reproduction. Do not add test files to the repo; propose missing tests as findings.

@@ -3,3 +3,6 @@ node_modules/
 
 # agent-dashboard live status (volatile)
 .agent-status/
+
+# reviewer scratch space (review/CONTRACT.md, Probing)
+.review-tmp/
