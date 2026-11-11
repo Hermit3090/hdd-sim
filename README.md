@@ -79,3 +79,7 @@ npm test
 - **R10.5, identical files.** Page and command share the same code and give byte-identical files
   in Chromium. Other browsers may round sine and exponential functions differently in the last
   digit; this has not been checked.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE).

@@ -2,6 +2,7 @@
   "name": "hdd-sim",
   "version": "0.1.0",
   "description": "Hard drive sound synthesizer with an emulated activity light",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "engines": { "node": ">=20" },
