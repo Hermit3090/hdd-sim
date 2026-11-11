@@ -217,7 +217,8 @@ It applies in live mode only.
   background brightness to 100 %, the click level in a straight line in dB from the background
   click level to 0 dB. The level that counts is the one at the moment the seek starts.
 - R8.10 The page shows, in manual mode, the baseline and whether the current activity is rated
-  background or normal, and in adaptive mode the activity level.
+  background or normal, and in adaptive mode the activity level. Of the baseline settings it shows
+  only those of the selected mode; with the baseline off it shows none.
 - R8.11 The page starts in live mode.
 
 ### Preset folder
