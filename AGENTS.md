@@ -13,9 +13,9 @@
 - No dependencies: plain JavaScript ES modules, nothing to install.
 - Run `npm test` before every commit of code and before every review kickoff.
 - Commit locally; never push.
-- Review files: never write into or commit a `review/results-*.md` file beyond creating its empty sections, and do
-  not edit `review/CONTRACT.md` while a review round is running. When asked to run the current engagement as the
-  reviewer, `review/CONTRACT.md` applies in place of these rules.
+- Reviews: never write into or commit a reviewer's results file (`tickets/T-NNN/result.md` of a review ticket, or
+  `review/results-*.md`), and do not edit `review/CONTRACT.md` while a review round is running. When you run a
+  review round as the reviewer, `review/CONTRACT.md` applies in place of these rules.
 
 <!-- agent-dashboard:begin (managed by `agentstat rules`; edits inside this block are overwritten) -->
 ## Progress status (agent-dashboard)

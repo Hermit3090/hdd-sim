@@ -1,25 +1,25 @@
 # Reviewer contract — hdd-sim
 
-This contract applies when you were told to **run the current engagement** in `review/what-to-review.md`. In that run you are the independent reviewer. The reviewer is set in `.agent-roles` (currently `codex`). You did NOT build this and must not modify it. Builder rules in `AGENTS.md` and `CLAUDE.md` don't apply to this run; read them only as context for what the builder was told. The one exception is the **Review engagements** part of the agent-dashboard block at the end of your instruction file (`AGENTS.md` for codex, `CLAUDE.md` for claude): its finding format, `agentstat review check` and status calls apply to you.
+This contract applies when you run a review round: a `review` ticket assigned to you (`tickets/T-NNN/contract.md` is the kickoff), or, in a phase that uses review files, the current engagement in `review/what-to-review.md`. In that run you are the independent reviewer. The reviewer is set in `.agent-roles` (currently `codex`). You did NOT build this and must not modify it. Builder rules in `AGENTS.md` and `CLAUDE.md` don't apply to this run; read them only as context for what the builder was told. The one exception is the **Review engagements** part of the agent-dashboard block at the end of your instruction file (`AGENTS.md` for codex, `CLAUDE.md` for claude): its finding format, `agentstat review check` and status calls apply to you.
 
 ## Authority chain
 
-- `docs/SPEC.md`, at the commit named in the kickoff's Contract line, is the contract. Requirements have IDs (R4.4, R8.13, A1, …); cite them.
+- `docs/SPEC.md`, in the version named in the kickoff's Contract line, is the contract. Requirements have IDs (R4.4, R8.13, A1, …); cite them.
 - `README.md` describes use; where it disagrees with the spec, the spec wins and the disagreement is a finding.
 - Commit messages and builder summaries are claims, not evidence. Check them against the repo and your own runs.
 - The files in `presets/` are the user's own saved parameter files. They are data, not a contract, and need not match the built-in presets.
 
 ## Write policy
 
-You may write to exactly ONE path: the results file named under "Current engagement" in `review/what-to-review.md`. Commit only that file. Append into its pre-made sections; never rewrite earlier sections. Every other file in `review/` is a prior, closed engagement (read-only; those verdicts stand). Do not create or modify any other file in the repo; the gitignored `out/` folder written by the export command is fine. Do not install packages: the project has no dependencies and must stay that way.
+You may write to exactly ONE path: the results file of the round. For a review ticket that is `tickets/<its id>/result.md`; for a file round it is the file named under "Current engagement" in `review/what-to-review.md`. Commit only that file, by path. Use the sections the kickoff names, in its order. The results of every earlier round, in `tickets/` and in `review/`, are closed (read-only; those verdicts stand). Do not create or modify any other file in the repo; the gitignored `out/` folder written by the export command is fine. Do not install packages: the project has no dependencies and must stay that way.
 
 ## Commit the results
 
-After the verdict is written and `agentstat review check` is clean, run `git add <results file>` and `git commit` only: never `-a`, never amend, never push. If `git status --short` shows any other modified or staged tracked file, do not commit; say so and stop. Commit identity is the repo's (`Hermit3090 <273447898+Hermit3090@users.noreply.github.com>`; see `AGENTS.md`). Message:
+After the verdict is written and `agentstat review check` is clean (for a ticket round: `agentstat review check --ticket <id>`), record a ticket round's result with `agentstat -a <your name> ticket result <id> <verdict> --file tickets/<id>/result.md`. Then run `git add <results file>` and `git commit` only: never `-a`, never amend, never push. If `git status --short` shows any other modified or staged tracked file, do not commit; say so and stop. Commit identity is the repo's (`Hermit3090 <273447898+Hermit3090@users.noreply.github.com>`; see `AGENTS.md`). Message:
 
-    Review <phase> round <N>: <VERDICT> [spec <short sha from the Contract line>]
+    Review <phase> round <N>: <VERDICT> [spec v<version>]
 
-    Engagement: <slug>
+    Engagement: <ticket id or slug>
     Contract: <the kickoff's Contract line>
     Reviewed: <baseline>..<short sha of the last commit you reviewed>
     Findings: <b> blocker, <s> should-fix, <n> nit. New: <IDs>. Upheld: <IDs>. Resolved: <IDs>.
