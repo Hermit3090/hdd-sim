@@ -120,6 +120,8 @@ function decimals(step) {
 function buildControl(item) {
   const row = document.createElement('div');
   row.className = 'row';
+  // R8.10: a baseline setting shows only while its mode is selected.
+  if (item.mode) refreshers.push(() => { row.hidden = params.live.baselineMode !== item.mode; });
   const id = `p-${item.path.replace(/\./g, '-')}`;
   if (item.type === 'bool') {
     const label = document.createElement('label');
@@ -555,6 +557,7 @@ function init() {
   });
   $('baseline-mode').addEventListener('change', () => {
     params.live.baselineMode = $('baseline-mode').value;
+    refreshAll();
     pushParams();
   });
   $('device').addEventListener('change', () => post({ type: 'baseline-reset' }));

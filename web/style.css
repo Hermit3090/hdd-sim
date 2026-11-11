@@ -81,3 +81,5 @@ td:last-child { width: 1%; padding-right: 0; }
 .filters input[type="number"] { width: 68px; }
 .filters select { width: auto; }
 .filters .check { color: var(--text); font-size: 14px; }
+
+[hidden] { display: none !important; }
