@@ -1,0 +1,4 @@
+# agent roles (SPEC §9e; written by `agentstat init` / `agentstat roles` / `agentstat review roles`)
+builder: claude
+reviewer: codex
+planner: claude

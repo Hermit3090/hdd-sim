@@ -1,2 +1,5 @@
 out/
 node_modules/
+
+# agent-dashboard live status (volatile)
+.agent-status/
