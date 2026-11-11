@@ -1,5 +1,7 @@
 # hdd-sim specification
 
+Version: 1.0 (2026-11-12). The version changes with every approved change to this document.
+
 Status: APPROVED by the owner on 2026-11-10. Changes to this document need owner approval.
 
 ## 1. Purpose
