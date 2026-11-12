@@ -53,3 +53,16 @@ test('R8.14, R6.14: a load that completes after a later choice does not overwrit
   await choose('G.json', { promise: Promise.resolve({ seed: 7 }) });
   assert.deepEqual(applied.at(-1), ['G.json', 7]);
 });
+
+test('R9.8: the Spin up button pulses three times when the page opens, then stops', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../web/style.css', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
+  assert.match(html, /<button id="spin-up"/);
+  const rule = css.match(/#spin-up\s*\{\s*animation:\s*([^;]+);/);
+  assert.ok(rule, 'the button has an animation');
+  const [name, , , , count] = rule[1].trim().split(/\s+/);
+  assert.equal(count, '3');
+  assert.ok(css.includes(`@keyframes ${name}`));
+  assert.doesNotMatch(rule[1], /infinite|forwards/);
+});
