@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import fs, { appendFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -164,6 +165,54 @@ test('R8.13: other names, links, sub-folders, large files and paths out of the f
     const res = await get(path);
     assert.equal(res.status, 404, path);
     assert.ok(!res.body.includes('secret'), path);
+  }
+});
+
+// Runs `change` once, right after the server has checked `name` with lstat and
+// before it opens the file: the gap a file changed at the wrong moment falls into.
+async function withChangeAfterCheck(name, change, fn) {
+  const original = fs.lstatSync;
+  let pending = change;
+  fs.lstatSync = function lstatThenChange(path, ...rest) {
+    const info = original.call(this, path, ...rest);
+    if (pending && String(path).endsWith(`${name}`)) {
+      const run = pending;
+      pending = null;
+      run();
+    }
+    return info;
+  };
+  syncBuiltinESMExports();
+  try {
+    await fn();
+    assert.equal(pending, null, 'the change ran between check and read');
+  } finally {
+    fs.lstatSync = original;
+    syncBuiltinESMExports();
+  }
+}
+
+test('R8.1, R8.13: a preset file changed between check and read is not served, and never ends the server', async () => {
+  const race = join(presetsDir, 'race.json');
+  const changes = {
+    'replaced by a link': () => { unlinkSync(race); symlinkSync(join(secretDir, 'secret.json'), race); },
+    'grown past 1 MB': () => appendFileSync(race, ' '.repeat(2 * 1024 * 1024)),
+    'deleted': () => unlinkSync(race),
+  };
+  try {
+    for (const [what, change] of Object.entries(changes)) {
+      writeFileSync(race, '{}');
+      await withChangeAfterCheck('race.json', change, async () => {
+        const res = await get('/presets/race.json');
+        assert.equal(res.status, 404, what);
+        assert.ok(!res.body.includes('secret'), what);
+        assert.ok(res.body.length < 1024, what);
+      });
+      rmSync(race, { force: true });
+      assert.equal((await get('/presets/a-first.json')).status, 200, `${what}: the server still runs`);
+    }
+  } finally {
+    rmSync(race, { force: true });
   }
 });
 

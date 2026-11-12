@@ -3,7 +3,7 @@
 // streams disk statistics. Loopback only, read only.
 //   node src/server/server.js [--port 8125] [--presets <folder>]
 
-import { createReadStream, lstatSync, readdirSync, statSync } from 'node:fs';
+import { closeSync, constants, createReadStream, fstatSync, lstatSync, openSync, readSync, readdirSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,28 @@ function isPresetFile(dir, name) {
     return info.isFile() && info.size <= PRESET_MAX_BYTES;
   } catch {
     return false;
+  }
+}
+
+// Reads a file through one open handle: links are not followed (O_NOFOLLOW),
+// type and size are checked on the handle, and at most maxBytes are read.
+// Returns null for anything else, also when the file changes or fails while
+// it is read, so that no file can end the server process.
+function readRegularFile(path, maxBytes) {
+  let fd;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    const info = fstatSync(fd);
+    if (!info.isFile() || info.size > maxBytes) return null;
+    const buf = Buffer.alloc(maxBytes + 1);
+    let n = 0;
+    let got;
+    while (n < buf.length && (got = readSync(fd, buf, n, buf.length - n, null)) > 0) n += got;
+    return n > maxBytes ? null : buf.subarray(0, n);
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 }
 
@@ -150,13 +172,14 @@ export function createHddSimServer({ port = DEFAULT_PORT, sampler = createSample
       } catch {
         /* a malformed name is not found */
       }
-      if (name === '') send(200, TYPES['.json'], JSON.stringify(listPresets(presets)));
-      else if (name === null || !isPresetFile(presets, name)) send(404, 'text/plain', 'Not found');
-      else {
-        res.writeHead(200, { 'Content-Type': TYPES['.json'], 'Cache-Control': 'no-store' });
-        if (req.method === 'HEAD') res.end();
-        else createReadStream(join(presets, name)).pipe(res);
+      if (name === '') {
+        send(200, TYPES['.json'], JSON.stringify(listPresets(presets)));
+        return;
       }
+      const body = name !== null && isPresetFile(presets, name)
+        ? readRegularFile(join(presets, name), PRESET_MAX_BYTES) : null;
+      if (body) send(200, TYPES['.json'], body);
+      else send(404, 'text/plain', 'Not found');
       return;
     }
 
