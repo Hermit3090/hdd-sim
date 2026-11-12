@@ -34,6 +34,7 @@ export class Engine {
     this.rngActivity = makeRng(seed, 4);
     this.model = new DriveModel(params.drive, this.rngModel);
     this.model.ready = false;
+    this.model.levelAt = () => this.bgLift();
     this.activity = new ActivityGenerator(params.sim, this.rngActivity);
     this.clicks = new ClickSynth(params.click, sampleRate);
     this.spindle = new Spindle(params.spindle, params.drive.rpm, sampleRate, makeRng(seed, 3));
@@ -268,9 +269,10 @@ export class Engine {
     if (normalS > 0) light = 1 - (1 - light) * Math.exp(-normalS / (lp.onMs / 1000));
     if (bgS > 0) {
       // R8.9: background activity lifts the light to the background brightness only.
+      // The level that counts is the one when each operation's seek started.
       const live = this.p.live;
       const low = (live.baselineMode === 'manual' ? live.manualBgLightPct : live.bgLightPct) / 100;
-      const target = low + (1 - low) * this.bgLift();
+      const target = low + (1 - low) * (model.bgLevelBusy / bgS);
       if (light < target) light = target - (target - light) * Math.exp(-bgS / (lp.onMs / 1000));
       else light = Math.max(target, light * Math.exp(-bgS / (lp.offMs / 1000)));
     }

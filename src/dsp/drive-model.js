@@ -14,6 +14,9 @@ export class DriveModel {
     this.serving = false;
     this.servingBg = false;
     this.bgBusy = 0; // seconds of the last advance spent on background operations
+    this.bgLevelBusy = 0; // the same seconds, each weighted by its operation's level
+    this.servingLevel = 0;
+    this.levelAt = () => 0; // R8.9: the activity level, read when service starts
     this.ready = true; // false while the spindle is not at speed
     this.idleS = 0;
     this.recalIn = -1;
@@ -74,12 +77,16 @@ export class DriveModel {
     let t = 0;
     let busy = 0;
     this.bgBusy = 0;
+    this.bgLevelBusy = 0;
     while (t < dt) {
       if (this.serving) {
         const run = Math.min(this.remaining, dt - t);
         this.remaining -= run;
         busy += run;
-        if (this.servingBg) this.bgBusy += run;
+        if (this.servingBg) {
+          this.bgBusy += run;
+          this.bgLevelBusy += run * this.servingLevel;
+        }
         t += run;
         if (this.remaining <= 1e-12) this.serving = false;
         else break;
@@ -123,6 +130,7 @@ export class DriveModel {
     this.remaining = seekS + rotationS + transferS;
     this.serving = true;
     this.servingBg = !!op.bg;
+    this.servingLevel = op.bg ? this.levelAt() : 0;
     if (op.dist > 0) onSeek(offsetS, op.dist, seekS, op);
   }
 }

@@ -570,6 +570,27 @@ test('R8.9: in adaptive mode light limit and click level move from background to
   assert.ok(quiet(0.5) > 0);
 });
 
+test('R8.9: the light limit of an operation uses the activity level at the moment its seek started', () => {
+  const engine = liveEngine({ baselineMode: 'adaptive', bgLightPct: 7, rampUpS: 0.4 });
+  engine.setParams(sanitizeParams({ ...engine.p, drive: { ...engine.p.drive, maxTransferMs: 2000 } }));
+  engine.feed(1, 16e6, 0.05);
+  render(engine, 0.1);
+  assert.equal(engine.baseline.level, 0.125);
+  const captured = 0.07 + 0.93 * 0.125;
+  assert.ok(engine.model.busy && engine.model.remaining > 1.5, 'the long operation is still served');
+  assert.ok(Math.abs(engine.light - captured) < 0.01, `light ${engine.light}`);
+  engine.feed(1, 16e6, 0.05); // raises the level while the first operation is served
+  assert.equal(engine.baseline.level, 0.25);
+  for (let i = 0; i < 20; i++) {
+    render(engine, 128 / SR);
+    assert.ok(engine.light <= captured + 1e-9, `light ${engine.light} stays at the captured limit`);
+  }
+  assert.ok(engine.model.busy && engine.model.queue.length === 1, 'still the first operation');
+  // The next operation takes the level of its own start.
+  render(engine, 2);
+  assert.ok(engine.light > captured + 0.05, `light ${engine.light} after the second operation started`);
+});
+
 // ---------- read/write pattern ----------
 
 function watchOps(engine) {
