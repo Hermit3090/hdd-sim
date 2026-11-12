@@ -1,6 +1,6 @@
 # Runner limits and review format (agent-dashboard SPEC §9g). Committed; missing keys mean the defaults.
 review: tickets          # review rounds are tickets the runner can start
-runner-kinds: review     # the runner starts review tickets only; build work is started by the user
+runner-kinds: review, build   # the runner starts review rounds and build tickets
 # Defaults kept:
 # max-rounds: 10         # review rounds per phase before the runner stops and asks, 1-10
 # run-timeout: 60        # minutes of active time per run, 5-240
