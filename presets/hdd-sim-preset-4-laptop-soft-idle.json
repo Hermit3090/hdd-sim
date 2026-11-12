@@ -1,0 +1,209 @@
+{
+  "version": 2,
+  "seed": 1,
+  "preset": "laptop-2000s",
+  "mix": {
+    "headDb": 0,
+    "spindleDb": 0,
+    "masterDb": -6
+  },
+  "live": {
+    "baselineMode": "adaptive",
+    "baselineOps": 99,
+    "rampUpS": 0.4,
+    "cooldownS": 3,
+    "bgLightPct": 7,
+    "bgClickDb": -18,
+    "manualBgLightPct": 15,
+    "manualBgClickDb": -7.5
+  },
+  "pattern": {
+    "on": true,
+    "readSpread": 0.9,
+    "writeSpread": 0.5,
+    "writeReach": 0.2,
+    "flushS": 5
+  },
+  "scenario": "light desktop use",
+  "sim": {
+    "opsPerSec": 4,
+    "burstiness": 0.85,
+    "burstLen": 5,
+    "seekSpread": 0.7,
+    "readMix": 0.7,
+    "opSizeKB": 32
+  },
+  "export": {
+    "sampleRate": 44100,
+    "clickCount": 16,
+    "distMin": 0.05,
+    "distMax": 1,
+    "burstScenario": "light desktop use",
+    "burstSeconds": 8,
+    "loopSeconds": 4,
+    "idleSeconds": 20
+  },
+  "drive": {
+    "rpm": 4200,
+    "settleMs": 2,
+    "fullStrokeMs": 22,
+    "transferMBps": 8,
+    "queueMax": 64,
+    "maxTransferMs": 30,
+    "idleRecal": true,
+    "idleAfterS": 5,
+    "recalMinS": 20,
+    "recalMaxS": 60
+  },
+  "click": {
+    "levelDb": -11,
+    "burstMs": 1.5,
+    "resonators": [
+      {
+        "freq": 1115,
+        "decayMs": 9,
+        "gainDb": -3
+      },
+      {
+        "freq": 1390,
+        "decayMs": 10,
+        "gainDb": 0
+      },
+      {
+        "freq": 1600,
+        "decayMs": 8,
+        "gainDb": -1.5
+      },
+      {
+        "freq": 1935,
+        "decayMs": 9,
+        "gainDb": 0
+      },
+      {
+        "freq": 3620,
+        "decayMs": 6,
+        "gainDb": 0
+      },
+      {
+        "freq": 6253,
+        "decayMs": 6,
+        "gainDb": -2.5
+      }
+    ],
+    "body": {
+      "freq": 237,
+      "decayMs": 14,
+      "gainDb": -19.5
+    },
+    "varFreqPct": 4,
+    "varLevelDb": 3,
+    "varDecayPct": 20,
+    "pairThreshold": 0.3,
+    "distLevelDb": 3,
+    "brightnessDb": 4
+  },
+  "spindle": {
+    "motorDb": -24,
+    "harmonics": [
+      {
+        "n": 1,
+        "db": 0
+      },
+      {
+        "n": 10,
+        "db": -25
+      },
+      {
+        "n": 12,
+        "db": -28
+      }
+    ],
+    "whineHz": 4300,
+    "whineDb": -100,
+    "noiseDb": -45,
+    "noiseHz": 1060,
+    "noiseQ": 0.7,
+    "wobble": 0.13,
+    "spinUpS": 4,
+    "spinDownS": 6,
+    "unlockClicks": true
+  },
+  "rw": {
+    "mode": "combined",
+    "writePitchPct": -6,
+    "writeLevelDb": 0
+  },
+  "light": {
+    "onMs": 2,
+    "offMs": 30,
+    "color": "green"
+  },
+  "filters": {
+    "hpMode": "combined",
+    "lpMode": "combined",
+    "hp": {
+      "all": {
+        "on": true,
+        "hz": 150,
+        "resDb": 0,
+        "slope": 12
+      },
+      "head": {
+        "on": false,
+        "hz": 150,
+        "resDb": 0,
+        "slope": 12
+      },
+      "motor": {
+        "on": false,
+        "hz": 150,
+        "resDb": 0,
+        "slope": 12
+      },
+      "air": {
+        "on": false,
+        "hz": 150,
+        "resDb": 0,
+        "slope": 12
+      },
+      "whine": {
+        "on": false,
+        "hz": 150,
+        "resDb": 0,
+        "slope": 12
+      }
+    },
+    "lp": {
+      "all": {
+        "on": true,
+        "hz": 4000,
+        "resDb": 0,
+        "slope": 12
+      },
+      "head": {
+        "on": false,
+        "hz": 4000,
+        "resDb": 0,
+        "slope": 12
+      },
+      "motor": {
+        "on": false,
+        "hz": 4000,
+        "resDb": 0,
+        "slope": 12
+      },
+      "air": {
+        "on": false,
+        "hz": 4000,
+        "resDb": 0,
+        "slope": 12
+      },
+      "whine": {
+        "on": false,
+        "hz": 4000,
+        "resDb": 0,
+        "slope": 12
+      }
+    }
+  }
+}
