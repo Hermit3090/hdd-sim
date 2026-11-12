@@ -142,6 +142,31 @@ test('R5.5: the queue is bounded and overflow merges into the newest operation',
   assert.equal(model.queue[0].bytes, 1000);
 });
 
+test('R5.5: lowering the queue length applies to work already queued; the newest operation keeps its type', () => {
+  const drive = defaultParams().drive;
+  const model = new DriveModel(drive, makeRng(1));
+  for (let i = 0; i < 63; i++) model.addOp(400000, 0.5);
+  model.addOp(1000, 0.3, true);
+  const total = model.queue.reduce((sum, op) => sum + op.bytes, 0);
+  model.setParams({ ...drive, queueMax: 4 });
+  assert.equal(model.queue.length, 4);
+  assert.equal(model.queue.reduce((sum, op) => sum + op.bytes, 0), total, 'no work is lost');
+  assert.deepEqual(model.queue.slice(0, 3).map((op) => op.bytes), [400000, 400000, 400000]);
+  assert.deepEqual([model.queue[3].write, model.queue[3].dist], [true, 0.3]);
+  model.setParams({ ...drive, queueMax: 1 });
+  assert.equal(model.queue.length, 1);
+  assert.equal(model.queue[0].bytes, total);
+  assert.equal(model.queue[0].write, true);
+
+  // Through the engine, as the page changes the setting while sound plays (R9.4).
+  const engine = new Engine(sanitizeParams({ drive: { idleRecal: false } }), 48000);
+  engine.spinUp(true);
+  for (let i = 0; i < 64; i++) engine.model.addOp(400000, 0.5);
+  engine.setParams(sanitizeParams({ drive: { idleRecal: false, queueMax: 1 } }));
+  engine.process(new Float32Array(128));
+  assert.ok(engine.model.queue.length <= 1, `${engine.model.queue.length} queued`);
+});
+
 test('R5.5: after a flood far beyond what the drive can serve, it is idle again within seconds', () => {
   const model = new DriveModel(defaultParams().drive, makeRng(1));
   const noSeek = () => {};

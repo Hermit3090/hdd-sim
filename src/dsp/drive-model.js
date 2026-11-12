@@ -24,6 +24,15 @@ export class DriveModel {
 
   setParams(p) {
     this.p = p;
+    // R5.5: a smaller maximum applies to work already queued. The excess is
+    // merged into the newest operation, which keeps its type (R6.21).
+    const q = this.queue;
+    const max = Math.max(1, p.queueMax);
+    if (q.length > max) {
+      const newest = q[q.length - 1];
+      for (let i = max - 1; i < q.length - 1; i++) newest.bytes += q[i].bytes;
+      q.splice(max - 1, q.length - max);
+    }
   }
 
   get busy() {
