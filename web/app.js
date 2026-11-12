@@ -1,11 +1,10 @@
 // The page: controls, light, live statistics, and export downloads.
 
-import { exportAll, exportClicks, exportSequence } from '/dsp/export.js';
+import { pageExport } from '/dsp/export.js';
 import {
   DEFAULT_PRESET, FILTER_LIMITS, PRESET_NAMES, RESONATOR_LIMITS, SCENARIO_NAMES, SCHEMA,
   applyPreset, defaultParams, getPath, sanitizeParams, scenarioParams, setPath,
 } from '/dsp/params.js';
-import { makeZip } from '/dsp/zip.js';
 import { createLoadGate } from '/loads.js';
 
 const STORE_KEY = 'hdd-sim-params';
@@ -495,20 +494,12 @@ function runExport(what) {
   // Let the status text paint before the render blocks the page.
   setTimeout(() => {
     try {
-      const p = sanitizeParams(params);
-      if (what === 'clicks') {
-        const files = exportClicks(p);
-        download('hdd-clicks.zip', makeZip(files), 'application/zip');
-        status.textContent = `Saved ${files.length} clicks in hdd-clicks.zip.`;
-      } else if (what === 'all') {
-        const files = exportAll(p);
-        download('hdd-sim-export.zip', makeZip(files), 'application/zip');
-        status.textContent = `Saved ${files.length} files in hdd-sim-export.zip.`;
-      } else {
-        const file = exportSequence(what, p);
-        download(file.name, file.data, 'audio/wav');
-        status.textContent = `Saved ${file.name}.`;
-      }
+      // The files are built by the shared export core (R10.5); the page only downloads them.
+      const result = pageExport(what, params);
+      download(result.name, result.data, result.type);
+      if (what === 'clicks') status.textContent = `Saved ${result.files.length} clicks in ${result.name}.`;
+      else if (what === 'all') status.textContent = `Saved ${result.files.length} files in ${result.name}.`;
+      else status.textContent = `Saved ${result.name}.`;
     } catch (err) {
       status.textContent = `Export failed: ${err.message}`;
       status.classList.add('error');

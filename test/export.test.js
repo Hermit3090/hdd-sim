@@ -4,7 +4,9 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { ONE_SHOT_PEAK, SEQUENCE_NAMES, exportAll, exportClicks, renderSequence } from '../src/dsp/export.js';
+import {
+  ONE_SHOT_PEAK, SEQUENCE_NAMES, exportAll, exportClicks, pageExport, renderSequence,
+} from '../src/dsp/export.js';
 import { PRESET_NAMES, SAMPLE_RATES, defaultParams } from '../src/dsp/params.js';
 import { decodeWav } from '../src/dsp/wav.js';
 import { makeZip } from '../src/dsp/zip.js';
@@ -128,6 +130,82 @@ test('R10.5: the command writes exactly the files the shared export code produce
       assert.ok(Buffer.from(f.data).equals(readFileSync(join(out, f.name))), `${f.name} differs`);
     }
     assert.throws(() => execFileSync(process.execPath, [CLI, '--rate', '22050', '--out', out], { stdio: 'pipe' }));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** The files in a stored (uncompressed) ZIP, read from its local headers. */
+function unzipStored(zip) {
+  const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+  const files = [];
+  let pos = 0;
+  while (view.getUint32(pos, true) === 0x04034b50) {
+    assert.equal(view.getUint16(pos + 8, true), 0, 'stored');
+    const size = view.getUint32(pos + 18, true);
+    const nameLen = view.getUint16(pos + 26, true);
+    const extraLen = view.getUint16(pos + 28, true);
+    const name = Buffer.from(zip.subarray(pos + 30, pos + 30 + nameLen)).toString('latin1');
+    const start = pos + 30 + nameLen + extraLen;
+    files.push({ name, data: zip.subarray(start, start + size) });
+    pos = start + size;
+  }
+  return files;
+}
+
+test('R10.4, R10.5: the page export path with non-default parameters gives the same files as the command', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hdd-sim-page-'));
+  try {
+    // Many settings away from their defaults, as a user would leave them in the page.
+    const p = defaultParams('laptop-2000s');
+    p.seed = 4242;
+    p.export.sampleRate = 48000;
+    p.export.clickCount = 3;
+    p.export.distMin = 0.2;
+    p.export.burstScenario = 'thrash';
+    p.export.burstSeconds = 1;
+    p.export.idleSeconds = 1;
+    p.export.loopSeconds = 1;
+    p.spindle.spinUpS = 1;
+    p.spindle.spinDownS = 1;
+    p.mix.headDb = -3;
+    p.mix.spindleDb = -9;
+    p.mix.masterDb = -2;
+    p.rw.mode = 'separate';
+    p.rw.writePitchPct = -10;
+    p.click.resonators[0].freq = 1234;
+    p.filters.lpMode = 'separate';
+    Object.assign(p.filters.lp.head, { on: true, hz: 2500, resDb: 6, slope: 24 });
+    const paramFile = join(dir, 'params.json');
+    writeFileSync(paramFile, JSON.stringify(p));
+    const out = join(dir, 'out');
+    execFileSync(process.execPath, [CLI, '--params', paramFile, '--out', out]);
+    const cli = Object.fromEntries(readdirSync(out).map((name) => [name, readFileSync(join(out, name))]));
+    const same = (files, what) => {
+      for (const f of files) assert.ok(cli[f.name] && Buffer.from(f.data).equals(cli[f.name]), `${what}: ${f.name} differs from the command's`);
+    };
+
+    const all = pageExport('all', p);
+    assert.equal(all.name, 'hdd-sim-export.zip');
+    assert.equal(all.type, 'application/zip');
+    const inZip = unzipStored(all.data);
+    assert.deepEqual(inZip.map((f) => f.name).sort(), Object.keys(cli).sort());
+    assert.ok(inZip.some((f) => f.name === 'click_write_01.wav'), 'separate write sound reached the export');
+    same(inZip, 'all');
+
+    const clicks = pageExport('clicks', p);
+    assert.equal(clicks.name, 'hdd-clicks.zip');
+    const clickFiles = unzipStored(clicks.data);
+    assert.equal(clickFiles.length, 6);
+    same(clickFiles, 'clicks');
+
+    for (const kind of SEQUENCE_NAMES) {
+      const one = pageExport(kind, p);
+      assert.deepEqual([one.name, one.type], [`${kind}.wav`, 'audio/wav']);
+      same([one], kind);
+    }
+    // The parameters matter: the defaults give other files.
+    assert.ok(!Buffer.from(pageExport('burst', defaultParams()).data).equals(cli['burst.wav']));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

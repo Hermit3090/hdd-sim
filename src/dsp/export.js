@@ -8,6 +8,7 @@ import { dbToGain, sanitizeParams, scenarioParams } from './params.js';
 import { makeRng } from './prng.js';
 import { renderSpindleLoop } from './spindle.js';
 import { encodeWav } from './wav.js';
+import { makeZip } from './zip.js';
 
 export const ONE_SHOT_MAX_S = 0.06;
 export const ONE_SHOT_PEAK = Math.pow(10, -1 / 20); // -1 dBFS
@@ -147,4 +148,24 @@ export function exportSequence(kind, input) {
 export function exportAll(input) {
   const p = sanitizeParams(input);
   return [...exportClicks(p), ...SEQUENCE_NAMES.map((kind) => exportSequence(kind, p))];
+}
+
+/**
+ * What one export button of the page saves (R10.4): the current parameters
+ * rendered by the same functions the command uses (R10.5), as one download.
+ * @param {'clicks'|'all'|string} what 'clicks', 'all' or a sequence name
+ * @returns {{name: string, data: Uint8Array, type: string, files: {name: string, data: Uint8Array}[]}}
+ */
+export function pageExport(what, params) {
+  const p = sanitizeParams(params);
+  if (what === 'clicks') {
+    const files = exportClicks(p);
+    return { name: 'hdd-clicks.zip', data: makeZip(files), type: 'application/zip', files };
+  }
+  if (what === 'all') {
+    const files = exportAll(p);
+    return { name: 'hdd-sim-export.zip', data: makeZip(files), type: 'application/zip', files };
+  }
+  const file = exportSequence(what, p);
+  return { name: file.name, data: file.data, type: 'audio/wav', files: [file] };
 }
