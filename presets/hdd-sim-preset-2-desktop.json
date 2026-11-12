@@ -166,7 +166,9 @@
     "rampUpS": 0.4,
     "cooldownS": 8,
     "bgLightPct": 28,
-    "bgClickDb": -15.5
+    "bgClickDb": -15.5,
+    "manualBgLightPct": 15,
+    "manualBgClickDb": -7.5
   },
   "pattern": {
     "on": true,
