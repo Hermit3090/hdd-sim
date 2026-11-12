@@ -1,6 +1,6 @@
 # hdd-sim specification
 
-Version: 1.1 (2026-11-12). The version changes with every approved change to this document.
+Version: 1.2 (2026-11-12). The version changes with every approved change to this document.
 
 Status: APPROVED by the owner on 2026-11-10. Changes to this document need owner approval.
 
@@ -181,7 +181,8 @@ audible indicator.
 - R8.1 A local Node server serves the page and a statistics stream. It listens on 127.0.0.1 only
   (default port 8125, configurable). It has no authentication, no write endpoints, and serves no
   files outside the project's web and synth-core directories, except parameter files from the
-  preset folder (R8.12).
+  preset folder (R8.12). At most 16 statistics streams are open at a time; a further one is
+  refused with status 503. A stream whose client has more than 256 KiB of unsent data is closed.
 - R8.2 The server reads `/proc/diskstats` at 20 Hz and streams, per whole-disk device, the
   change since the previous sample: reads, writes, bytes read, bytes written. Transport is
   server-sent events.
