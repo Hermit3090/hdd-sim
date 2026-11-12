@@ -6,7 +6,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { createSampler, delta, parseDiskstats, wholeDisks } from '../src/server/diskstats.js';
-import { HOST, SAMPLE_HZ, createHddSimServer } from '../src/server/server.js';
+import { connect } from 'node:net';
+import {
+  HOST, SAMPLE_HZ, STATS_MAX_STREAMS, STATS_MAX_UNSENT_BYTES, createHddSimServer,
+} from '../src/server/server.js';
 
 const SAMPLE = `   7       0 loop0 100 0 2000 50 0 0 0 0 0 60 50 0 0 0 0 0 0
  259       0 nvme0n1 1000 20 80000 300 500 40 16000 900 0 700 1300 0 0 0 0 10 100
@@ -292,4 +295,69 @@ test('R8.2: statistics are streamed as server-sent events at 20 Hz', async () =>
   }
   const mean = messages.slice(1).reduce((sum, m) => sum + m.dt, 0) / (messages.length - 1);
   assert.ok(Math.abs(mean - 0.05) < 0.015, `mean interval ${mean}`);
+});
+
+/** Opens a statistics stream and resolves with its status once the head arrives. */
+function openStream() {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: HOST, port, path: '/stats' }, (res) => {
+      res.resume();
+      resolve({ status: res.statusCode, close: () => req.destroy() });
+    });
+    req.on('error', (err) => { if (err.code !== 'ECONNRESET') reject(err); });
+    req.end();
+  });
+}
+
+test('R8.1: the number of open statistics streams is limited', async () => {
+  const streams = [];
+  try {
+    for (let i = 0; i < STATS_MAX_STREAMS; i++) streams.push(await openStream());
+    assert.ok(streams.every((s) => s.status === 200));
+    const refused = await openStream();
+    assert.equal(refused.status, 503);
+    refused.close();
+    assert.equal((await get('/')).status, 200, 'the page is still served');
+    streams.pop().close();
+    let again;
+    for (let i = 0; i < 50; i++) {
+      again = await openStream();
+      if (again.status === 200) break;
+      again.close();
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    assert.equal(again.status, 200, 'a closed stream frees its place');
+    streams.push(again);
+  } finally {
+    for (const s of streams) s.close();
+  }
+});
+
+test('R8.1: a statistics client that does not take its data is dropped', async () => {
+  // Large frames fill the socket buffers quickly; a normal frame is a few hundred bytes.
+  const devices = {};
+  for (let i = 0; i < 20000; i++) devices[`sd${i}`] = [1, 2, 3, 4];
+  const other = createHddSimServer({ sampler: () => devices, presetsDir });
+  const sockets = [];
+  other.on('connection', (socket) => sockets.push(socket));
+  await new Promise((resolve) => other.listen(0, HOST, resolve));
+  const stalled = connect(other.address().port, HOST);
+  try {
+    await new Promise((resolve) => stalled.on('connect', resolve));
+    stalled.write(`GET /stats HTTP/1.1\r\nHost: ${HOST}\r\n\r\n`);
+    stalled.pause(); // reads nothing more
+    let dropped = false;
+    for (let i = 0; i < 300 && !dropped; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      dropped = sockets.length === 1 && sockets[0].destroyed;
+      if (sockets.length === 1 && !dropped) {
+        assert.ok(sockets[0].writableLength <= STATS_MAX_UNSENT_BYTES + 1024 * 1024, 'unsent data stays bounded');
+      }
+    }
+    assert.ok(dropped, 'the stalled client was dropped');
+  } finally {
+    stalled.destroy();
+    other.closeAllConnections();
+    await new Promise((resolve) => other.close(resolve));
+  }
 });

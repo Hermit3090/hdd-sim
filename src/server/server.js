@@ -12,6 +12,10 @@ import { createSampler } from './diskstats.js';
 export const HOST = '127.0.0.1';
 export const DEFAULT_PORT = 8125;
 export const SAMPLE_HZ = 20;
+// Internal safeguards for the statistics stream: at most this many open
+// streams, and a client whose unsent data passes the bound is dropped.
+export const STATS_MAX_STREAMS = 16;
+export const STATS_MAX_UNSENT_BYTES = 256 * 1024;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const DEFAULT_PRESETS_DIR = join(ROOT, 'presets');
@@ -126,7 +130,16 @@ export function createHddSimServer({ port = DEFAULT_PORT, sampler = createSample
     last = now;
     const message = devices ? { dt, devices } : { unavailable: true };
     const frame = `data: ${JSON.stringify(message)}\n\n`;
-    for (const res of clients) res.write(frame);
+    for (const res of clients) {
+      if (res.writableLength > STATS_MAX_UNSENT_BYTES) {
+        // A client that does not take its data is dropped; the page reconnects.
+        clients.delete(res);
+        res.destroy();
+      } else {
+        res.write(frame);
+      }
+    }
+    if (clients.size === 0) stopSampling();
   };
   const startSampling = () => {
     if (timer) return;
@@ -154,6 +167,10 @@ export function createHddSimServer({ port = DEFAULT_PORT, sampler = createSample
     const path = (req.url || '/').split('?')[0];
 
     if (path === '/stats') {
+      if (req.method === 'GET' && clients.size >= STATS_MAX_STREAMS) {
+        res.writeHead(503, { 'Content-Type': 'text/plain', 'Retry-After': '5' }).end('Too many statistics streams');
+        return;
+      }
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-store',
