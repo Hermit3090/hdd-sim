@@ -119,7 +119,7 @@ test('R8.1: the page, its script and the synth core are served', async () => {
   const page = await get('/');
   assert.equal(page.status, 200);
   assert.match(page.type, /text\/html/);
-  for (const path of ['/app.js', '/worklet.js', '/dsp/engine.js', '/dsp/export.js']) {
+  for (const path of ['/app.js', '/loads.js', '/worklet.js', '/dsp/engine.js', '/dsp/export.js']) {
     const res = await get(path);
     assert.equal(res.status, 200, path);
     assert.match(res.type, /text\/javascript/, path);

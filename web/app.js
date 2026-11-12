@@ -6,6 +6,7 @@ import {
   applyPreset, defaultParams, getPath, sanitizeParams, scenarioParams, setPath,
 } from '/dsp/params.js';
 import { makeZip } from '/dsp/zip.js';
+import { createLoadGate } from '/loads.js';
 
 const STORE_KEY = 'hdd-sim-params';
 const LIVE_TIMEOUT_MS = 1000;
@@ -18,6 +19,7 @@ let pushQueued = false;
 const FILE_KEY = 'hdd-sim-file';
 let loadedFile = ''; // name of the parameter file the settings came from, if any
 let presetFiles = []; // file names in the server's preset folder (R8.14)
+const loads = createLoadGate(); // the newest preset, file or reset choice wins
 try {
   loadedFile = localStorage.getItem(FILE_KEY) || '';
 } catch {
@@ -573,16 +575,22 @@ function init() {
     const choice = $('preset').value;
     if (choice.startsWith('file:')) {
       const name = choice.slice(5);
-      if (!presetFiles.includes(name)) return; // loaded by hand; there is nothing to read again
-      fetch(`/presets/${encodeURIComponent(name)}`)
-        .then((res) => (res.ok ? res.json() : Promise.reject(new Error('the server did not return it'))))
-        .then((loaded) => loadParamsObject(loaded, name))
-        .catch((err) => {
+      if (!presetFiles.includes(name)) {
+        loads.invalidate(); // loaded by hand; there is nothing to read again
+        return;
+      }
+      loads.run(
+        () => fetch(`/presets/${encodeURIComponent(name)}`)
+          .then((res) => (res.ok ? res.json() : Promise.reject(new Error('the server did not return it')))),
+        (loaded) => loadParamsObject(loaded, name),
+        (err) => {
           setParamsStatus(`${name} could not be loaded: ${err.message}`, true);
           buildPresetSelect();
-        });
+        },
+      );
       return;
     }
+    loads.invalidate();
     setLoadedFile('');
     applyPreset(params, choice);
     refreshAll();
@@ -639,13 +647,14 @@ function init() {
     const file = $('params-file').files[0];
     $('params-file').value = '';
     if (!file) return;
-    try {
-      loadParamsObject(JSON.parse(await file.text()), file.name);
-    } catch (err) {
-      setParamsStatus(`${file.name} could not be loaded: ${err.message}`, true);
-    }
+    await loads.run(
+      async () => JSON.parse(await file.text()),
+      (loaded) => loadParamsObject(loaded, file.name),
+      (err) => setParamsStatus(`${file.name} could not be loaded: ${err.message}`, true),
+    );
   });
   $('params-reset').addEventListener('click', () => {
+    loads.invalidate();
     const preset = params.preset || DEFAULT_PRESET;
     const masterDb = params.mix.masterDb;
     params = defaultParams(preset);
