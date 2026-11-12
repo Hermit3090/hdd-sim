@@ -119,29 +119,35 @@ export const DEFAULT_PRESET = 'desktop-90s-2';
 export const DEFAULT_SCENARIO = 'light desktop use';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
+// Names are looked up as own properties only, so that names like
+// "constructor" or "__proto__" in a parameter file are unknown names.
+const own = (obj, key) => typeof key === 'string' && Object.prototype.hasOwnProperty.call(obj, key);
+const field = (obj, key) => (own(obj, key) ? obj[key] : undefined);
+const presetName = (name) => (own(PRESETS, name) ? name : DEFAULT_PRESET);
+const scenarioName = (name) => (own(SCENARIOS, name) ? name : DEFAULT_SCENARIO);
 
 /** Everything a preset sets (a fresh copy). The mix has no master volume. */
 export function presetParams(name) {
-  return clone(PRESETS[name] || PRESETS[DEFAULT_PRESET]);
+  return clone(PRESETS[presetName(name)]);
 }
 
 /** Puts a preset's settings into a parameter object; the master volume stays. */
 export function applyPreset(params, name) {
   const preset = presetParams(name);
   const masterDb = params.mix ? params.mix.masterDb : DEFAULT_MASTER_DB;
-  Object.assign(params, preset, { preset: PRESETS[name] ? name : DEFAULT_PRESET });
+  Object.assign(params, preset, { preset: presetName(name) });
   params.mix.masterDb = masterDb;
   return params;
 }
 
 /** Simulation parameters of a scenario (a fresh copy). */
 export function scenarioParams(name) {
-  return clone(SCENARIOS[name] || SCENARIOS[DEFAULT_SCENARIO]);
+  return clone(SCENARIOS[scenarioName(name)]);
 }
 
 /** A complete parameter object. */
 export function defaultParams(preset = DEFAULT_PRESET) {
-  const name = PRESETS[preset] ? preset : DEFAULT_PRESET;
+  const name = presetName(preset);
   return applyPreset({
     version: PARAMS_VERSION,
     seed: 1,
@@ -257,14 +263,20 @@ export function setPath(obj, path, value) {
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const num = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 
+// Longest list taken from a parameter file; validation shortens it further.
+const MAX_LIST = 64;
+
+// Takes over only the known fields of `base`, each only from an own property
+// of `over` and only with the same type. Everything else in `over` is ignored.
 function merge(base, over) {
   if (over === null || typeof over !== 'object' || Array.isArray(over)) return base;
   for (const key of Object.keys(base)) {
-    if (!(key in over)) continue;
+    if (!own(over, key)) continue;
     const b = base[key];
     const o = over[key];
     if (Array.isArray(b)) {
-      if (Array.isArray(o)) base[key] = clone(o);
+      // The entries are rebuilt field by field in sanitizeParams.
+      if (Array.isArray(o)) base[key] = o.slice(0, MAX_LIST);
     } else if (b !== null && typeof b === 'object') {
       merge(b, o);
     } else if (typeof o === typeof b) {
@@ -276,12 +288,14 @@ function merge(base, over) {
 
 /**
  * Returns a complete, valid parameter object. Missing values come from the
- * named preset, out-of-range values are clamped, unknown keys are dropped.
+ * named preset, out-of-range values are clamped, unknown keys are dropped,
+ * and numbers that are not finite fall back to the preset's value. A hostile
+ * parameter file can at worst give default values.
  */
 export function sanitizeParams(input) {
-  const src = input && typeof input === 'object' ? input : {};
-  const p = merge(defaultParams(typeof src.preset === 'string' ? src.preset : DEFAULT_PRESET), src);
-  if (src.version === 1) {
+  const src = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const p = merge(defaultParams(own(src, 'preset') ? presetName(src.preset) : DEFAULT_PRESET), src);
+  if (own(src, 'version') && src.version === 1) {
     // Version 1 switched spindle parts off at -60 dB; that is now an audible level.
     for (const key of ['motorDb', 'whineDb', 'noiseDb']) {
       if (p.spindle[key] <= SILENCE_DB) p.spindle[key] = PART_SILENCE_DB;
@@ -289,9 +303,10 @@ export function sanitizeParams(input) {
   }
   p.version = PARAMS_VERSION;
   p.seed = Math.floor(clamp(num(p.seed, 1), 0, 0xffffffff));
-  if (!PRESETS[p.preset]) p.preset = DEFAULT_PRESET;
-  if (!SCENARIOS[p.scenario]) p.scenario = DEFAULT_SCENARIO;
-  if (!SCENARIOS[p.export.burstScenario]) p.export.burstScenario = DEFAULT_SCENARIO;
+  p.preset = presetName(p.preset);
+  p.scenario = scenarioName(p.scenario);
+  p.export.burstScenario = scenarioName(p.export.burstScenario);
+  const defaults = defaultParams(p.preset);
   if (!SAMPLE_RATES.includes(p.export.sampleRate)) p.export.sampleRate = 44100;
   if (!LIGHT_COLORS.includes(p.light.color)) p.light.color = 'green';
   if (!SPLIT_MODES.includes(p.rw.mode)) p.rw.mode = 'combined';
@@ -300,14 +315,14 @@ export function sanitizeParams(input) {
     if (!SPLIT_MODES.includes(p.filters[`${type}Mode`])) p.filters[`${type}Mode`] = 'combined';
     for (const target of FILTER_TARGETS) {
       const f = p.filters[type][target];
+      const d = defaults.filters[type][target];
       const L = FILTER_LIMITS;
-      f.hz = clamp(f.hz, L.hz[0], L.hz[1]);
-      f.resDb = clamp(f.resDb, L.resDb[0], L.resDb[1]);
+      f.hz = clamp(num(f.hz, d.hz), L.hz[0], L.hz[1]);
+      f.resDb = clamp(num(f.resDb, d.resDb), L.resDb[0], L.resDb[1]);
       if (!L.slopes.includes(f.slope)) f.slope = 12;
     }
   }
 
-  const defaults = defaultParams(p.preset);
   for (const item of SCHEMA) {
     const fallback = getPath(defaults, item.path);
     const v = getPath(p, item.path);
@@ -322,20 +337,20 @@ export function sanitizeParams(input) {
 
   const L = RESONATOR_LIMITS;
   let res = p.click.resonators
-    .filter((r) => r && typeof r === 'object')
+    .filter((r) => r && typeof r === 'object' && !Array.isArray(r))
     .slice(0, L.count[1])
     .map((r) => ({
-      freq: clamp(num(r.freq, 1500), L.freq[0], L.freq[1]),
-      decayMs: clamp(num(r.decayMs, 7), L.decayMs[0], L.decayMs[1]),
-      gainDb: clamp(num(r.gainDb, 0), L.gainDb[0], L.gainDb[1]),
+      freq: clamp(num(field(r, 'freq'), 1500), L.freq[0], L.freq[1]),
+      decayMs: clamp(num(field(r, 'decayMs'), 7), L.decayMs[0], L.decayMs[1]),
+      gainDb: clamp(num(field(r, 'gainDb'), 0), L.gainDb[0], L.gainDb[1]),
     }));
   if (res.length < L.count[0]) res = defaults.click.resonators;
   p.click.resonators = res;
 
   let harm = p.spindle.harmonics
-    .filter((h) => h && typeof h === 'object')
+    .filter((h) => h && typeof h === 'object' && !Array.isArray(h))
     .slice(0, 16)
-    .map((h) => ({ n: Math.round(clamp(num(h.n, 1), 1, 40)), db: clamp(num(h.db, 0), -60, 6) }));
+    .map((h) => ({ n: Math.round(clamp(num(field(h, 'n'), 1), 1, 40)), db: clamp(num(field(h, 'db'), 0), -60, 6) }));
   if (harm.length === 0) harm = defaults.spindle.harmonics;
   p.spindle.harmonics = harm;
   return p;
