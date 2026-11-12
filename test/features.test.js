@@ -10,7 +10,7 @@ import { Engine } from '../src/dsp/engine.js';
 import { exportClicks, renderClickSet, renderSequence } from '../src/dsp/export.js';
 import { Filter } from '../src/dsp/filters.js';
 import {
-  FILTER_TARGETS, PRESET_NAMES, applyPreset, defaultParams, sanitizeParams, scenarioParams,
+  FILTER_LIMITS, FILTER_TARGETS, PRESET_NAMES, applyPreset, defaultParams, sanitizeParams, scenarioParams,
 } from '../src/dsp/params.js';
 import { makeRng } from '../src/dsp/prng.js';
 
@@ -96,6 +96,16 @@ test('R6.15: high-pass and low-pass with cutoff, 12 or 24 dB per octave, and a r
   }
 });
 
+test('R6.15: resonance is 0-12 dB; values outside are clamped (spec 1.1)', () => {
+  assert.deepEqual(FILTER_LIMITS.resDb, [0, 12]);
+  const p = defaultParams();
+  Object.assign(p.filters.hp.all, { resDb: 24 });
+  Object.assign(p.filters.lp.head, { resDb: -3 });
+  const s = sanitizeParams(JSON.parse(JSON.stringify(p)));
+  assert.equal(s.filters.hp.all.resDb, 12);
+  assert.equal(s.filters.lp.head.resDb, 0);
+});
+
 test('R6.17: preset filter defaults; a filter that is off changes nothing', () => {
   const on = (hz, resDb = 0) => ({ on: true, hz, resDb, slope: 12 });
   const off = (hz) => ({ on: false, hz, resDb: 0, slope: 12 });
@@ -122,7 +132,7 @@ test('R6.17: preset filter defaults; a filter that is off changes nothing', () =
       p.filters.hpMode = mode;
       p.filters.lpMode = mode;
       for (const type of ['hp', 'lp']) {
-        for (const target of FILTER_TARGETS) Object.assign(p.filters[type][target], { hz: 700, resDb: 24, slope: 24 });
+        for (const target of FILTER_TARGETS) Object.assign(p.filters[type][target], { hz: 700, resDb: 12, slope: 24 });
       }
     }), 2);
     assert.deepEqual(withOffFilters, plain);
@@ -199,7 +209,7 @@ test('R6.16: a high-pass on the motor tones removes the deep rotation tone and k
 
 test('R6.18: filters act before the mixer gains; layer isolation (R6.12) and the limiter (R6.13) still hold', () => {
   const loud = (p) => {
-    for (const type of ['hp', 'lp']) Object.assign(p.filters[type].all, { on: true, hz: 1400, resDb: 24, slope: 24 });
+    for (const type of ['hp', 'lp']) Object.assign(p.filters[type].all, { on: true, hz: 1400, resDb: 12, slope: 24 });
   };
   const headOnly = render(thrash((p) => { loud(p); p.mix.spindleDb = -60; }));
   const otherSpindle = render(thrash((p) => { loud(p); p.mix.spindleDb = -60; p.spindle.motorDb = 0; p.spindle.whineDb = 0; }));
@@ -214,11 +224,11 @@ test('R6.18: filters act before the mixer gains; layer isolation (R6.12) and the
 test('R6.19: one-shot clicks with filters still meet R10.2', () => {
   const settingsList = [
     (p) => { Object.assign(p.filters.hp.all, { on: true, hz: 600, resDb: 12, slope: 24 }); },
-    (p) => { Object.assign(p.filters.lp.all, { on: true, hz: 900, resDb: 24, slope: 12 }); },
+    (p) => { Object.assign(p.filters.lp.all, { on: true, hz: 900, resDb: 12, slope: 12 }); },
     (p) => {
       p.filters.hpMode = 'separate';
       p.filters.lpMode = 'separate';
-      Object.assign(p.filters.hp.head, { on: true, hz: 20, resDb: 24, slope: 24 });
+      Object.assign(p.filters.hp.head, { on: true, hz: 20, resDb: 12, slope: 24 });
       Object.assign(p.filters.lp.head, { on: true, hz: 2500 });
     },
   ];
@@ -250,7 +260,7 @@ test('R6.19: one-shot clicks with filters still meet R10.2', () => {
 
 test('R6.19: filters apply to sequences, and the filtered spindle loop still repeats without a seam', () => {
   const edits = [
-    (p) => { Object.assign(p.filters.hp.all, { on: true, hz: 20, resDb: 24, slope: 24 }); },
+    (p) => { Object.assign(p.filters.hp.all, { on: true, hz: 20, resDb: 12, slope: 24 }); },
     (p) => {
       p.filters.hpMode = 'separate';
       Object.assign(p.filters.hp.motor, { on: true, hz: 250, resDb: 6, slope: 24 });

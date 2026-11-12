@@ -9,7 +9,7 @@ export const PART_SILENCE_DB = -100;
 export const PARAMS_VERSION = 2;
 export const LIGHT_COLORS = ['red', 'green', 'amber'];
 export const FILTER_TARGETS = ['all', 'head', 'motor', 'air', 'whine']; // 'all' is the combined filter
-export const FILTER_LIMITS = { hz: [20, 20000], resDb: [0, 24], slopes: [12, 24] };
+export const FILTER_LIMITS = { hz: [20, 20000], resDb: [0, 12], slopes: [12, 24] };
 export const SPLIT_MODES = ['combined', 'separate'];
 export const BASELINE_MODES = ['off', 'manual', 'adaptive'];
 
