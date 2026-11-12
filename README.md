@@ -80,6 +80,10 @@ npm test
   in Chromium, Brave and Firefox (checked by the user with the `laptop-2000s` preset). Safari has
   not been checked; it may round sine and exponential functions differently in the last digit.
 
+## Contributing
+
+Reports and suggestions are welcome as issues; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Licence
 
 MIT, see [LICENSE](LICENSE).
