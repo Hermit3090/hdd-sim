@@ -1,6 +1,6 @@
 # hdd-sim specification
 
-Version: 1.3 (2026-11-12). The version changes with every approved change to this document.
+Version: 1.4 (2026-11-12). The version changes with every approved change to this document.
 
 Status: APPROVED by the owner on 2026-11-10. Changes to this document need owner approval.
 
@@ -129,7 +129,11 @@ Reference measurements behind the defaults are in section 11.
   reference in section 11), "desktop-90s" (5400 rpm, louder and clackier head, bearing whine) and
   "desktop-90s-2" (the default; the owner's tuning of "desktop-90s" with a quieter bearing whine). A preset sets every
   setting of the page's Drive, Mix and Filters sections: drive model, head click, read and write
-  sound, spindle, light, head and spindle volume, and all filters. The master volume is not part
+  sound, spindle, light, head and spindle volume, and all filters. A preset also sets the
+  settings of the Activity source section: baseline (R8.6–R8.9), simulation scenario and its
+  controls (R9.1), and read/write pattern (R9.5–R9.7); all shipped presets hold the default
+  values given in those requirements. The choice between live and simulation mode is not part
+  of a preset. The master volume is not part
   of a preset. All of these, the master volume included, are in the parameter file (R4.5).
   Loading a parameter file in the page keeps the page's current master volume, and the preset
   selector then shows the file's name. Saved parameter files are independent of the shipped
