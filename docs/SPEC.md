@@ -1,6 +1,6 @@
 # hdd-sim specification
 
-Version: 1.0 (2026-11-12). The version changes with every approved change to this document.
+Version: 1.1 (2026-11-12). The version changes with every approved change to this document.
 
 Status: APPROVED by the owner on 2026-11-10. Changes to this document need owner approval.
 
@@ -98,7 +98,8 @@ Reference measurements behind the defaults are in section 11.
 - R6.4 Click level and brightness rise with seek distance. Seeks longer than a threshold
   (default distance 0.3) produce two clicks, one at the start and one at the end of the seek.
   Shorter seeks produce one.
-- R6.5 A single click lasts at most 60 ms from onset to below −60 dB relative to its peak.
+- R6.5 A single click lasts at most 60 ms from onset to below −60 dB relative to its peak. The
+  limit applies to the click before the filters of section 6.5; a filter may ring longer.
 - R6.6 The head layer contains nothing but clicks: no noise floor, no hum, no reverb.
 
 ### 6.2 Spindle
@@ -138,7 +139,7 @@ Reference measurements behind the defaults are in section 11.
 ### 6.5 Filters
 
 - R6.15 A filter is a high-pass or a low-pass with four settings: on/off, cutoff frequency
-  (20 Hz–20 kHz), resonance (a boost at the cutoff, 0–24 dB) and slope (12 or 24 dB per octave).
+  (20 Hz–20 kHz), resonance (a boost at the cutoff, 0–12 dB) and slope (12 or 24 dB per octave).
 - R6.16 High-pass mode is "combined" or "separate". Combined: one high-pass filter acts on all
   four sound parts. Separate: each sound part has its own high-pass filter. Low-pass mode is
   chosen the same way, independently of the high-pass mode. The defaults come from the preset
