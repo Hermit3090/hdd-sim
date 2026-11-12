@@ -51,7 +51,7 @@ export class Engine {
     this.simEnabled = false;
     this.feeds = [];
     this.heldWrites = []; // sizes of simulated writes waiting for the next flush (R9.7)
-    this.flushIn = 0;
+    this.flushIn = params.pattern.flushS; // seconds to the next flush (R9.7)
     this.light = 0;
     this.lightSum = 0;
     this.lightCount = 0;
@@ -78,6 +78,8 @@ export class Engine {
 
   /** Simulated activity on or off (off in live mode). */
   setSimEnabled(on) {
+    // R9.7: a simulation starts a flush cycle; its first flush is one interval away.
+    if (on && !this.simEnabled) this.flushIn = this.p.pattern.flushS;
     this.simEnabled = !!on;
     if (!on) this.activity.wait = 0;
     else this.baseline.reset(); // live history means nothing after a pause

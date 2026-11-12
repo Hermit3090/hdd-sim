@@ -646,6 +646,29 @@ test('R9.7: simulated writes are collected and passed on together at every flush
 
 // ---------- presets ----------
 
+test('R9.7: the first simulated write waits for the first flush interval, also after simulation is switched on again', () => {
+  const engine = thrash((p) => {
+    p.sim = { ...p.sim, opsPerSec: 40, burstiness: 0, readMix: 0 };
+    Object.assign(p.pattern, { on: true, flushS: 5 });
+  });
+  const ops = watchOps(engine);
+  render(engine, 6);
+  const first = Math.min(...ops.map((o) => o.t));
+  assert.ok(ops.every((o) => o.write));
+  assert.ok(Math.abs(first - 5) < 0.01, `first write at ${first} s`);
+  assert.ok(ops.filter((o) => o.t === first).length > 150, 'about 5 s x 40 writes/s in the first flush');
+
+  engine.setSimEnabled(false);
+  render(engine, 1);
+  engine.setSimEnabled(true);
+  const again = engine.pos / SR;
+  ops.length = 0;
+  render(engine, 4.9);
+  assert.equal(ops.length, 0, 'no write within the interval after switching on again');
+  render(engine, 0.2);
+  assert.ok(ops.length > 150 && ops.every((o) => Math.abs(o.t - again - 5) < 0.01));
+});
+
 test('R6.14: a preset sets every Drive, Mix and Filters setting, and leaves the master volume alone', () => {
   const groups = ['drive', 'click', 'spindle', 'rw', 'light', 'filters'];
   for (const name of PRESET_NAMES) {
