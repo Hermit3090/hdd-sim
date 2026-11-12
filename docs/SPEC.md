@@ -1,6 +1,6 @@
 # hdd-sim specification
 
-Version: 1.2 (2026-11-12). The version changes with every approved change to this document.
+Version: 1.3 (2026-11-12). The version changes with every approved change to this document.
 
 Status: APPROVED by the owner on 2026-11-10. Changes to this document need owner approval.
 
@@ -268,6 +268,9 @@ while reads happen on demand and jump around.
 - R9.7 On, in simulation mode only: write operations are not passed on when generated but
   collected and passed on together at every flush interval (default 5 s, range 0.5–30 s). Reads
   are not delayed. In live mode the timing is the real one and is not changed.
+- R9.8 When the page opens, in either mode, the "Spin up" button pulses softly three times and
+  then stays in its steady colour, as a cue that it must be pressed to start the sound. The page
+  does not start sound by itself.
 
 ## 10. Export
 
