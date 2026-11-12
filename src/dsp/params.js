@@ -105,6 +105,21 @@ for (const name of Object.keys(PRESETS)) {
   });
 }
 
+// A preset also sets the Activity source section (R6.14): baseline,
+// simulation and read/write pattern. All shipped presets hold the defaults.
+function addActivitySource() {
+  for (const name of Object.keys(PRESETS)) {
+    Object.assign(PRESETS[name], {
+      live: { baselineMode: 'adaptive', baselineOps: 99, rampUpS: 0.4, cooldownS: 8,
+        // R8.9: one pair per mode. bgLightPct/bgClickDb belong to adaptive mode.
+        bgLightPct: 7, bgClickDb: -18, manualBgLightPct: 15, manualBgClickDb: -7.5 },
+      pattern: { on: true, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 },
+      scenario: DEFAULT_SCENARIO,
+      sim: { ...SCENARIOS[DEFAULT_SCENARIO] },
+    });
+  }
+}
+
 const SCENARIOS = {
   'idle': { opsPerSec: 0, burstiness: 0, burstLen: 5, seekSpread: 0.7, readMix: 0.8, opSizeKB: 32 },
   'light desktop use': { opsPerSec: 4, burstiness: 0.85, burstLen: 5, seekSpread: 0.7, readMix: 0.7, opSizeKB: 32 },
@@ -117,6 +132,7 @@ export const PRESET_NAMES = Object.keys(PRESETS);
 export const SCENARIO_NAMES = Object.keys(SCENARIOS);
 export const DEFAULT_PRESET = 'desktop-90s-2';
 export const DEFAULT_SCENARIO = 'light desktop use';
+addActivitySource();
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 // Names are looked up as own properties only, so that names like
@@ -153,12 +169,6 @@ export function defaultParams(preset = DEFAULT_PRESET) {
     seed: 1,
     preset: name,
     mix: { masterDb: DEFAULT_MASTER_DB },
-    live: { baselineMode: 'adaptive', baselineOps: 99, rampUpS: 0.4, cooldownS: 8,
-      // R8.9: one pair per mode. bgLightPct/bgClickDb belong to adaptive mode.
-      bgLightPct: 7, bgClickDb: -18, manualBgLightPct: 15, manualBgClickDb: -7.5 },
-    pattern: { on: true, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 },
-    scenario: DEFAULT_SCENARIO,
-    sim: scenarioParams(DEFAULT_SCENARIO),
     export: {
       sampleRate: 44100, clickCount: 16, distMin: 0.05, distMax: 1,
       burstScenario: 'light desktop use', burstSeconds: 8, loopSeconds: 4, idleSeconds: 20,

@@ -690,8 +690,8 @@ test('R9.7: the first simulated write waits for the first flush interval, also a
   assert.ok(ops.length > 150 && ops.every((o) => Math.abs(o.t - again - 5) < 0.01));
 });
 
-test('R6.14: a preset sets every Drive, Mix and Filters setting, and leaves the master volume alone', () => {
-  const groups = ['drive', 'click', 'spindle', 'rw', 'light', 'filters'];
+test('R6.14: a preset sets every Drive, Mix, Filters and Activity source setting, and leaves the master volume alone', () => {
+  const groups = ['drive', 'click', 'spindle', 'rw', 'light', 'filters', 'live', 'pattern', 'scenario', 'sim'];
   for (const name of PRESET_NAMES) {
     // Start from another preset with every preset setting changed.
     const p = defaultParams(name === 'laptop-2000s' ? 'desktop-90s' : 'laptop-2000s');
@@ -700,13 +700,24 @@ test('R6.14: a preset sets every Drive, Mix and Filters setting, and leaves the 
     p.light = { onMs: 20, offMs: 200, color: 'red' };
     p.filters.hpMode = 'separate';
     p.filters.lp.all.hz = 500;
-    p.live.rampUpS = 3;
+    p.live = { ...p.live, baselineMode: 'manual', baselineOps: 16, rampUpS: 3, bgLightPct: 28, manualBgClickDb: -30 };
+    p.pattern = { ...p.pattern, on: false, flushS: 12 };
+    p.scenario = 'thrash';
+    p.sim = scenarioParams('thrash');
+    p.seed = 77;
+    p.export.clickCount = 4;
     applyPreset(p, name);
     const fresh = defaultParams(name);
     assert.equal(p.preset, name);
     for (const group of groups) assert.deepEqual(p[group], fresh[group], `${name}: ${group}`);
     assert.deepEqual(p.mix, { headDb: fresh.mix.headDb, spindleDb: fresh.mix.spindleDb, masterDb: -20 });
-    assert.equal(p.live.rampUpS, 3, 'settings outside the preset stay');
+    assert.equal(p.seed, 77, 'settings outside the preset stay');
+    assert.equal(p.export.clickCount, 4, 'settings outside the preset stay');
+    // All shipped presets hold the activity-source defaults (R8.7-R8.9, R9.1, R9.5-R9.7).
+    assert.deepEqual(p.live, { baselineMode: 'adaptive', baselineOps: 99, rampUpS: 0.4, cooldownS: 8, bgLightPct: 7, bgClickDb: -18, manualBgLightPct: 15, manualBgClickDb: -7.5 });
+    assert.deepEqual(p.pattern, { on: true, readSpread: 0.9, writeSpread: 0.5, writeReach: 0.2, flushS: 5 });
+    assert.equal(p.scenario, 'light desktop use');
+    assert.deepEqual(p.sim, scenarioParams('light desktop use'));
     assert.deepEqual(sanitizeParams(p), p);
   }
   // R6.11 defaults, and all of it survives the parameter file.

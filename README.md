@@ -27,7 +27,7 @@ a file there with "Save parameters (JSON)" and it appears in the list. To use an
 - **Live** (the start mode) follows the disks of this computer. Real activity passes through the emulated drive, so
   an SSD still produces the pulsing pattern of a hard drive.
 - **Simulation** plays a scenario; every parameter can be changed while it runs.
-- **Presets** set everything in the Drive, Mix and Filters sections. The master volume is kept.
+- **Presets** set everything in the Drive, Mix, Filters and Activity source sections (not the choice of live or simulation). The master volume is kept.
 - **Spindle volume at −60 dB** leaves the head sound alone, for sampling.
 - **Idle baseline** (live mode): keeps a system's background disk activity quiet. "Adaptive"
   starts every activity dim and quiet and raises it to normal while the activity lasts (ramp-up
