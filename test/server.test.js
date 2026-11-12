@@ -134,6 +134,29 @@ test('R8.1: nothing outside the web and synth-core directories is served', async
   }
 });
 
+test('R8.1: symbolic links in the web and synth-core directories are not followed', async () => {
+  const root = join(import.meta.dirname, '..');
+  const tag = `link-test-${process.pid}`;
+  writeFileSync(join(secretDir, 'outside.js'), '// OUTSIDE_SENTINEL secret');
+  const links = [
+    [join(secretDir, 'secret.json'), join(root, 'web', `${tag}.json`), `/${tag}.json`],
+    [join(secretDir, 'outside.js'), join(root, 'src', 'dsp', `${tag}.js`), `/dsp/${tag}.js`],
+    [secretDir, join(root, 'web', tag), `/${tag}/secret.json`], // a linked folder in the path
+    [join(root, 'web', 'app.js'), join(root, 'web', `${tag}-inside.js`), `/${tag}-inside.js`], // even to a file inside
+  ];
+  try {
+    for (const [target, link] of links) symlinkSync(target, link);
+    for (const [, , path] of links) {
+      const res = await get(path);
+      assert.equal(res.status, 404, path);
+      assert.ok(!res.body.includes('secret') && !res.body.includes('SENTINEL'), path);
+    }
+    assert.equal((await get('/app.js')).status, 200);
+  } finally {
+    for (const [, link] of links) rmSync(link, { force: true });
+  }
+});
+
 test('R8.1: there are no write endpoints', async () => {
   for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
     assert.equal((await get('/', { method })).status, 405, method);

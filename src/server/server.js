@@ -3,7 +3,7 @@
 // streams disk statistics. Loopback only, read only.
 //   node src/server/server.js [--port 8125] [--presets <folder>]
 
-import { closeSync, constants, createReadStream, fstatSync, lstatSync, openSync, readSync, readdirSync, statSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,7 @@ export const DEFAULT_PRESETS_DIR = join(ROOT, 'presets');
 // R8.13: plain file names only, so a name can never leave the preset folder.
 const PRESET_NAME = /^[A-Za-z0-9_-][A-Za-z0-9 ._-]*\.json$/;
 const PRESET_MAX_BYTES = 1024 * 1024;
+const STATIC_MAX_BYTES = 8 * 1024 * 1024; // far above any file of the page
 
 // A preset file is a regular file (not a link) directly in the folder.
 function isPresetFile(dir, name) {
@@ -72,6 +73,22 @@ const TYPES = {
   '.json': 'application/json',
 };
 
+// Reads a file of the page or the synth core. Symbolic links are refused in
+// every part of the path below the mount (R8.1); the file itself is opened
+// without following links.
+function readStatic(dir, file) {
+  let at = dir;
+  for (const part of file.slice(dir.length + 1).split(sep)) {
+    at = join(at, part);
+    try {
+      if (lstatSync(at).isSymbolicLink()) return null;
+    } catch {
+      return null;
+    }
+  }
+  return readRegularFile(file, STATIC_MAX_BYTES);
+}
+
 function resolveFile(urlPath) {
   let path;
   try {
@@ -86,12 +103,8 @@ function resolveFile(urlPath) {
     const file = normalize(join(dir, path.slice(prefix.length)));
     if (!file.startsWith(dir + sep)) return null;
     if (!TYPES[extname(file)]) return null;
-    try {
-      if (statSync(file).isFile()) return file;
-    } catch {
-      /* not found */
-    }
-    return null;
+    const body = readStatic(dir, file);
+    return body && { file, body };
   }
   return null;
 }
@@ -183,14 +196,13 @@ export function createHddSimServer({ port = DEFAULT_PORT, sampler = createSample
       return;
     }
 
-    const file = resolveFile(path);
-    if (!file) {
+    const found = resolveFile(path);
+    if (!found) {
       res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': TYPES[extname(file)], 'Cache-Control': 'no-store' });
-    if (req.method === 'HEAD') res.end();
-    else createReadStream(file).pipe(res);
+    res.writeHead(200, { 'Content-Type': TYPES[extname(found.file)], 'Cache-Control': 'no-store' });
+    res.end(req.method === 'HEAD' ? undefined : found.body);
   });
   server.on('close', () => {
     stopSampling();
