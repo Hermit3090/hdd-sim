@@ -77,8 +77,8 @@ npm test
 ## Known deviations from the spec
 
 - **R10.5, identical files.** Page and command share the same code and give byte-identical files
-  in Chromium. Other browsers may round sine and exponential functions differently in the last
-  digit; this has not been checked.
+  in Chromium, Brave and Firefox (checked by the user with the `laptop-2000s` preset). Safari has
+  not been checked; it may round sine and exponential functions differently in the last digit.
 
 ## Licence
 
