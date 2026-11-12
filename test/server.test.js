@@ -310,6 +310,7 @@ function openStream() {
 }
 
 test('R8.1: the number of open statistics streams is limited', async () => {
+  assert.equal(STATS_MAX_STREAMS, 16, 'R8.1: at most 16 statistics streams');
   const streams = [];
   try {
     for (let i = 0; i < STATS_MAX_STREAMS; i++) streams.push(await openStream());
@@ -334,6 +335,7 @@ test('R8.1: the number of open statistics streams is limited', async () => {
 });
 
 test('R8.1: a statistics client that does not take its data is dropped', async () => {
+  assert.equal(STATS_MAX_UNSENT_BYTES, 256 * 1024, 'R8.1: more than 256 KiB unsent closes the stream');
   // Large frames fill the socket buffers quickly; a normal frame is a few hundred bytes.
   const devices = {};
   for (let i = 0; i < 20000; i++) devices[`sd${i}`] = [1, 2, 3, 4];

@@ -12,8 +12,8 @@ import { createSampler } from './diskstats.js';
 export const HOST = '127.0.0.1';
 export const DEFAULT_PORT = 8125;
 export const SAMPLE_HZ = 20;
-// Internal safeguards for the statistics stream: at most this many open
-// streams, and a client whose unsent data passes the bound is dropped.
+// R8.1: at most this many open statistics streams (a further one gets 503),
+// and a stream whose client has more than this much unsent data is closed.
 export const STATS_MAX_STREAMS = 16;
 export const STATS_MAX_UNSENT_BYTES = 256 * 1024;
 
