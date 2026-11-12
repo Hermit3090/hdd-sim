@@ -45,14 +45,17 @@ export function delta(prev, cur) {
 /**
  * Samples the system. Each call returns the change since the previous call
  * per whole disk, or null when statistics cannot be read (not Linux).
+ * A disk seen for the first time starts with no change; its counters are the
+ * baseline for the next sample.
  */
 export function createSampler({ statsPath = '/proc/diskstats', blockDir = '/sys/block' } = {}) {
   let prev = null;
-  let disks = null;
   return function sample() {
     let stats;
+    let disks;
     try {
-      if (!disks) disks = wholeDisks(readdirSync(blockDir));
+      // Read the disk list every time, so a disk attached later shows up (R8.2, R8.3).
+      disks = wholeDisks(readdirSync(blockDir));
       stats = parseDiskstats(readFileSync(statsPath, 'utf8'));
     } catch {
       return null;

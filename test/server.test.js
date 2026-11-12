@@ -36,6 +36,31 @@ test('R8.5: the sampler reports unavailable statistics as null', () => {
   assert.equal(sample(), null);
 });
 
+test('R8.2, R8.3: a disk attached while the server runs is found and starts from a baseline', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hdd-sim-disks-'));
+  try {
+    const blockDir = join(dir, 'block');
+    const statsPath = join(dir, 'diskstats');
+    mkdirSync(join(blockDir, 'sda'), { recursive: true });
+    const row = (name, reads, writes) => `   8       0 ${name} ${reads} 0 ${reads * 8} 5 ${writes} 0 ${writes * 8} 1 0 4 6\n`;
+    writeFileSync(statsPath, row('sda', 10, 2));
+    const sample = createSampler({ statsPath, blockDir });
+    assert.deepEqual(sample(), { sda: [0, 0, 0, 0] });
+
+    mkdirSync(join(blockDir, 'sdb'));
+    writeFileSync(statsPath, row('sda', 11, 2) + row('sdb', 500, 300));
+    assert.deepEqual(sample(), { sda: [1, 0, 8 * 512, 0], sdb: [0, 0, 0, 0] }, 'new disk: no change yet');
+    writeFileSync(statsPath, row('sda', 11, 2) + row('sdb', 504, 301));
+    assert.deepEqual(sample(), { sda: [0, 0, 0, 0], sdb: [4, 1, 32 * 512, 8 * 512] });
+
+    rmSync(join(blockDir, 'sdb'), { recursive: true });
+    writeFileSync(statsPath, row('sda', 11, 2));
+    assert.deepEqual(sample(), { sda: [0, 0, 0, 0] }, 'a removed disk disappears');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 let server;
 let port;
 let ticks = 0;
