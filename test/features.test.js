@@ -433,6 +433,10 @@ test('R8.7: baseline modes off, manual and adaptive; adaptive is the default', (
   assert.equal(manual.sample(1, DT), false);
   const s = sanitizeParams({ live: { baselineMode: 'x', baselineOps: 9999, rampUpS: 0, cooldownS: 999, bgLightPct: 400, bgClickDb: 5, manualBgLightPct: -3, manualBgClickDb: -99 } }).live;
   assert.deepEqual(s, { baselineMode: 'adaptive', baselineOps: 500, rampUpS: 0.1, cooldownS: 120, bgLightPct: 100, bgClickDb: 0, manualBgLightPct: 0, manualBgClickDb: -60 });
+  // Cooldown range 0.1-120 s (spec 1.5).
+  assert.equal(sanitizeParams({ live: { cooldownS: 0.1 } }).live.cooldownS, 0.1);
+  assert.equal(sanitizeParams({ live: { cooldownS: 0.3 } }).live.cooldownS, 0.3);
+  assert.equal(sanitizeParams({ live: { cooldownS: 0 } }).live.cooldownS, 0.1);
 });
 
 test('R8.8: the activity level rises with activity over the ramp-up time and falls over the cooldown time', () => {

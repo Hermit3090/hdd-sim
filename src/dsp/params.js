@@ -195,7 +195,7 @@ export const SCHEMA = [
 
   { group: 'Baseline', path: 'live.baselineOps', label: 'Manual baseline', min: 0, max: 500, step: 1, unit: '/s', mode: 'manual' },
   { group: 'Baseline', path: 'live.rampUpS', label: 'Adaptive ramp-up time', min: 0.1, max: 10, step: 0.1, unit: 's', mode: 'adaptive' },
-  { group: 'Baseline', path: 'live.cooldownS', label: 'Adaptive cooldown time', min: 1, max: 120, step: 1, unit: 's', mode: 'adaptive' },
+  { group: 'Baseline', path: 'live.cooldownS', label: 'Adaptive cooldown time', min: 0.1, max: 120, step: 0.1, unit: 's', mode: 'adaptive' },
   { group: 'Baseline', path: 'live.manualBgLightPct', label: 'Background brightness', min: 0, max: 100, step: 1, unit: '%', mode: 'manual' },
   { group: 'Baseline', path: 'live.manualBgClickDb', label: 'Background click level', min: -60, max: 0, step: 0.5, unit: 'dB', mode: 'manual' },
   { group: 'Baseline', path: 'live.bgLightPct', label: 'Background brightness', min: 0, max: 100, step: 1, unit: '%', mode: 'adaptive' },
