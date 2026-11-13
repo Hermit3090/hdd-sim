@@ -1,6 +1,6 @@
 # hdd-sim specification
 
-Version: 1.4 (2026-11-12). The version changes with every approved change to this document.
+Version: 1.5 (2026-11-13). The version changes with every approved change to this document.
 
 Status: APPROVED by the owner on 2026-11-10. Changes to this document need owner approval.
 
@@ -212,7 +212,7 @@ It applies in live mode only.
     takes it from 0 % to 100 % in the ramp-up time of uninterrupted activity (default 0.4 s,
     range 0.1–10 s).
   - During every sample without operations it falls, at a rate that takes it from 100 % to 0 %
-    in the cooldown time (default 8 s, range 1–120 s).
+    in the cooldown time (default 8 s, range 0.1–120 s).
   A single short burst therefore stays quiet, bursts that follow each other within the cooldown
   add up, and sustained activity reaches the normal level.
 - R8.9 Background activity passes through the drive model like normal activity, with two
